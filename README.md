@@ -214,6 +214,44 @@ PRs are welcome! Please:
 
 ---
 
+## 🆘 Troubleshooting
+
+### Command `ghost` not found (Windows)
+
+This is a common issue on Windows when Python Scripts folder is not in PATH.
+
+**Quick fix - Use Python module instead:**
+```bash
+python -m src --install
+python -m src --ghost
+```
+
+**Permanent fix - Add Scripts to PATH:**
+
+1. Find your Scripts folder:
+   ```powershell
+   python -c "import site; import os; print(os.path.join(site.getuserbase(), 'Scripts'))"
+   ```
+
+2. Add to PATH temporarily:
+   ```powershell
+   $env:Path += ";C:\Users\YourName\AppData\Roaming\Python\Python314\Scripts"
+   ```
+
+3. Add to PATH permanently:
+   - Press `Win + R`, type `sysdm.cpl`, press Enter
+   - Go to **Advanced** → **Environment Variables**
+   - Under **User variables**, find `Path` → **Edit**
+   - Click **New** and add the Scripts path
+   - Click **OK** and restart your terminal
+
+### Other Issues
+
+- **Not a git repo**: Make sure you're in a git repository (`git init` if needed)
+- **Import errors**: Reinstall with `pip install --upgrade ghost-protocol`
+
+---
+
 ## 📄 License
 
 MIT © 2024 — Do whatever you want with it.
