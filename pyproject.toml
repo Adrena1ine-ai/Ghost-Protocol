@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ghost-protocol"
+version = "1.0.0"
+description = "The automated guardian of your sanity. Auto-ignores junk & protects repos."
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Lazy Vibe Coder", email = "ghost@vibe.com"},
+]
+keywords = ["git", "automation", "pre-commit", "developer-tools", "vibe"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Software Development :: Version Control :: Git",
+]
+
+dependencies = [
+    "rich>=13.0.0",
+    "watchdog>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "mypy"]
+
+[project.scripts]
+ghost = "main:main" # Регистрируем команду 'ghost'
+
+[project.urls]
+Homepage = "https://github.com/yourname/ghost-protocol"
+Repository = "https://github.com/yourname/ghost-protocol"
+"Bug Tracker" = "https://github.com/yourname/ghost-protocol/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
