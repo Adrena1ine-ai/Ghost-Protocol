@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ghost-protocol"
-version = "1.0.0"
+version = "21.0.0"
 description = "The automated guardian of your sanity. Auto-ignores junk & protects repos."
 readme = "README.md"
 requires-python = ">=3.8"
@@ -12,7 +12,7 @@ license = {text = "MIT"}
 authors = [
     {name = "Lazy Vibe Coder", email = "ghost@vibe.com"},
 ]
-keywords = ["git", "automation", "pre-commit", "developer-tools", "vibe"]
+keywords = ["git", "automation", "pre-commit", "developer-tools", "vibe", "cursor", "ai-assistant"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
@@ -23,7 +23,10 @@ classifiers = [
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
 ]
 
 dependencies = [
@@ -35,13 +38,18 @@ dependencies = [
 dev = ["pytest", "black", "mypy"]
 
 [project.scripts]
-ghost = "main:main" # Регистрируем команду 'ghost'
+ghost = "main:main"
 
 [project.urls]
-Homepage = "https://github.com/yourname/ghost-protocol"
-Repository = "https://github.com/yourname/ghost-protocol"
-"Bug Tracker" = "https://github.com/yourname/ghost-protocol/issues"
+Homepage = "https://github.com/Adrena1ine-ai/Ghost-Protocol"
+Repository = "https://github.com/Adrena1ine-ai/Ghost-Protocol"
+"Bug Tracker" = "https://github.com/Adrena1ine-ai/Ghost-Protocol/issues"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["src*"]
+[tool.setuptools]
+# Find packages in src/
+packages = {find = {}}
+# Include main.py as a top-level module
+py-modules = ["main"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.txt", "*.json"]
