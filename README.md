@@ -23,7 +23,7 @@
 
 <br>
 
-<img src="https://raw.githubusercontent.com/yourusername/ghost-protocol/main/assets/demo.gif" alt="Ghost Protocol Demo" width="600">
+[![PyPI version](https://img.shields.io/pypi/v/ghost-protocol?style=for-the-badge)](https://pypi.org/project/ghost-protocol/)
 
 </div>
 
@@ -58,13 +58,23 @@ Then you notice:
 
 ## 📦 Installation
 
+### From PyPI (Recommended)
+
+```bash
+pip install ghost-protocol
+```
+
+After installation, the `ghost` command will be available globally.
+
+### From Source
+
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/ghost-protocol.git
-cd ghost-protocol
+git clone https://github.com/Adrena1ine-ai/Ghost-Protocol.git
+cd Ghost-Protocol
 
-# Install dependencies
-pip install -r requirements.txt
+# Install in development mode
+pip install -e .
 ```
 
 ---
@@ -75,13 +85,13 @@ pip install -r requirements.txt
 
 ```bash
 # 1. Install the git hook (one time only)
-python main.py --install
+ghost --install
 
-# 2. Start the guardian daemon
-python main.py --ghost
+# 2. Start the guardian daemon (run in background)
+ghost --ghost
 
 # 3. (Optional) Open the monitor in another terminal
-python main.py --monitor
+ghost --monitor
 ```
 
 Now forget about it. Ghost Protocol handles the rest.
