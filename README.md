@@ -1,106 +1,223 @@
-# Ghost Protocol 👻
-
 <div align="center">
 
-**The automated guardian of your sanity.**
+# 👻 Ghost Protocol
 
-[![Python Version](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+### *The silent guardian of your AI-assisted workflow*
 
-*Install once. Forget forever.*
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](http://makeapullrequest.com)
+
+<br>
+
+**Stop wasting tokens on garbage files.**<br>
+**Stop committing 50MB SQLite databases.**<br>
+**Stop explaining to AI why your project has 847 PNG files.**
+
+<br>
+
+[Installation](#-installation) •
+[Quick Start](#-quick-start) •
+[Features](#-features) •
+[Configuration](#%EF%B8%8F-configuration)
+
+<br>
+
+<img src="https://raw.githubusercontent.com/yourusername/ghost-protocol/main/assets/demo.gif" alt="Ghost Protocol Demo" width="600">
 
 </div>
 
 ---
 
-## ✨ Features
+## 🤔 The Problem
 
-Ghost Protocol watches your project in the background and protects you from yourself.
+You're vibe-coding with Claude/Cursor/Copilot. Life is good.
 
-- 🚫 **Auto-Ignore Heavy Assets:** Automatically adds large binaries/videos to `.gitignore` and `.cursorignore`.
-- 🧹 **Smart Cleanup:** Removes ignored file paths from `.gitignore` when you delete the files from disk.
-- 🛡️ **Commit Guard:** Blocks commits if you try to push giant source files (>500KB).
-- 📊 **Live Dashboard:** Beautiful terminal UI showing project stats (tokens, file count, cost).
-- 🚀 **Performance:** Uses a queue-based watcher with smart debouncing. Zero CPU impact.
+Then you notice:
+- 💸 Token costs are through the roof
+- 🐌 AI responses are slow because context is bloated  
+- 😱 You accidentally committed a 200MB video file
+- 🔄 AI keeps "seeing" your `node_modules` or `__pycache__`
+
+**Ghost Protocol fixes all of this. Automatically. In the background.**
 
 ---
 
-## 🚀 Installation
+## ✨ Features
 
-### From PyPI (Recommended)
+| Feature | What it does |
+|---------|--------------|
+| 🚫 **Auto-Ignore** | Detects heavy files (images, videos, databases) and adds them to `.gitignore` + `.cursorignore` |
+| 🧹 **Self-Cleaning** | Removes stale entries when you delete the original files |
+| 🛡️ **Commit Guard** | Blocks `git commit` if you try to push oversized source files |
+| 📊 **Live Monitor** | Beautiful TUI dashboard showing token count & estimated API cost |
+| ⚡ **Zero Config** | Works out of the box. Sensible defaults. |
+| 🔇 **Silent** | Runs in background. No notifications. No interruptions. |
+
+---
+
+## 📦 Installation
+
 ```bash
-pip install ghost-protocol
-From Source
-Bash
-
-git clone https://github.com/yourname/ghost-protocol.git
+# Clone the repo
+git clone https://github.com/yourusername/ghost-protocol.git
 cd ghost-protocol
-pip install -e .
-⚡ Usage
-1. Install Git Hook (One time)
-This sets up the pre-commit check automatically.
 
-Bash
+# Install dependencies
+pip install -r requirements.txt
+```
 
-ghost --install
-2. Run Background Daemon (Daily driver)
-Run this in a separate terminal (or minimize it). Ghost watches for file changes.
+---
 
-Bash
+## 🚀 Quick Start
 
-ghost --ghost
-3. Open Monitor (Optional)
-See your project stats in real-time.
+**Three commands. That's it.**
 
-Bash
+```bash
+# 1. Install the git hook (one time only)
+python main.py --install
 
-ghost --monitor
-⚙️ Configuration
-Create a ghost_config.json in your project root to customize behavior.
+# 2. Start the guardian daemon
+python main.py --ghost
 
-JSON
+# 3. (Optional) Open the monitor in another terminal
+python main.py --monitor
+```
 
+Now forget about it. Ghost Protocol handles the rest.
+
+---
+
+## 📊 The Monitor
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  👻 Ghost Protocol v21.0.0 | Status: ACTIVE                  │
+├─────────────────────────────┬────────────────────────────────┤
+│  📊 Project Stats           │  🧠 The Brain                  │
+│                             │                                │
+│  Total Tokens    1,247,832  │  • Writer: IgnoreManager (DRY) │
+│  Files Tracked        342   │  • Scanner: Auto-updating (30s)│
+│  Est. Cost ($3/M)  $3.74    │  • Config: Cached & Valid      │
+│                             │                                │
+│                             │  Press Ctrl+C to exit.         │
+└─────────────────────────────┴────────────────────────────────┘
+```
+
+---
+
+## ⚙️ Configuration
+
+Create `ghost_config.json` in your project root:
+
+```json
 {
   "limits": {
-    "max_asset_size_mb": 2.0,
-    "max_code_size_mb": 1.0
+    "max_asset_size_mb": 1.0,
+    "max_code_size_mb": 0.5,
+    "debounce_seconds": 0.5
   },
-  "skip_dirs": ["my_secret_folder"]
+  "skip_dirs": ["my_custom_folder", "secrets"],
+  "extensions": {
+    "garbage": [".custom", ".mybigfile"],
+    "code": [".mycode"]
+  }
 }
-🏗 Architecture
-Config Manager: Singleton pattern with thread-safe cached sets.
-File Locking: Cross-platform advisory locks (fcntl / msvcrt) to prevent race conditions.
-Queue System: Decoupled file watching (watchdog) from I/O operations using a thread-safe queue.
-Atomic Writes: All file modifications use temporary files + os.replace for data integrity.
-📝 License
-MIT License - see LICENSE file for details.
+```
 
-Made with 🧠 and a bit of 🍅.
+### Default Settings
 
-text
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `max_asset_size_mb` | 1.0 | Auto-ignore assets larger than this |
+| `max_code_size_mb` | 0.5 | Warn/block code files larger than this |
+| `debounce_seconds` | 0.5 | Wait time before processing file changes |
 
+### Pre-configured Skip Directories
 
-### 3. LICENSE (Новый файл)
-```text
-MIT License
+```
+venv, .venv, node_modules, __pycache__, .git, 
+.idea, .vscode, dist, build, coverage, target...
+```
 
-Copyright (c) 2023 Lazy Vibe Coder
+### Pre-configured Garbage Extensions
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+```
+.log, .sqlite, .db, .zip, .mp4, .mp3, .pdf, 
+.png, .jpg, .gif, .exe, .dll, .bin...
+```
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+---
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+## 🏗️ How It Works
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
+│  Watchdog   │────▶│   Queue     │────▶│  IgnoreManager  │
+│  (Events)   │     │  (Debounce) │     │  (Atomic Write) │
+└─────────────┘     └─────────────┘     └─────────────────┘
+                                               │
+                                               ▼
+                                        ┌─────────────┐
+                                        │ .gitignore  │
+                                        │.cursorignore│
+                                        └─────────────┘
+```
+
+**Key Design Decisions:**
+- **Singleton Config** — Thread-safe, cached sets for O(1) lookups
+- **File Locking** — Cross-platform advisory locks (fcntl/msvcrt)
+- **Atomic Writes** — temp file → os.replace() for data integrity
+- **Fail-Closed** — Git hook blocks commit on any error
+
+---
+
+## 🧑‍💻 For Developers
+
+```bash
+# Project structure
+ghost-protocol/
+├── main.py              # Entry point & CLI
+├── requirements.txt     # Dependencies
+└── src/
+    ├── config.py        # Singleton configuration
+    ├── core.py          # Logger & console
+    ├── utils.py         # Atomic write, file locking
+    ├── watcher.py       # File system events → queue
+    ├── scanner.py       # Project stats & git integration
+    ├── pruner.py        # Cleanup stale ignore entries
+    ├── ignore_manager.py # DRY: single source for ignore logic
+    └── monitor.py       # Rich TUI dashboard
+```
+
+---
+
+## 🤝 Contributing
+
+PRs are welcome! Please:
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+---
+
+## 📄 License
+
+MIT © 2024 — Do whatever you want with it.
+
+---
+
+<div align="center">
+
+**Made for vibe coders, by a vibe coder.**
+
+*Because life's too short to manually edit .gitignore*
+
+<br>
+
+⭐ Star this repo if Ghost saved your tokens ⭐
+
+</div>
