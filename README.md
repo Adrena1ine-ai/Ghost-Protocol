@@ -31,52 +31,36 @@ Ghost Protocol watches your project in the background and protects you from your
 ### From PyPI (Recommended)
 ```bash
 pip install ghost-protocol
-```
 From Source
 Bash
 
-```bash
 git clone https://github.com/yourname/ghost-protocol.git
 cd ghost-protocol
 pip install -e .
-```
-
-## ⚡ Usage
-
-### 1. Install Git Hook (One time)
+⚡ Usage
+1. Install Git Hook (One time)
 This sets up the pre-commit check automatically.
 
 Bash
 
-```bash
 ghost --install
-```
-
-### 2. Run Background Daemon (Daily driver)
+2. Run Background Daemon (Daily driver)
 Run this in a separate terminal (or minimize it). Ghost watches for file changes.
 
 Bash
 
-```bash
 ghost --ghost
-```
-
-### 3. Open Monitor (Optional)
+3. Open Monitor (Optional)
 See your project stats in real-time.
 
 Bash
 
-```bash
 ghost --monitor
-```
-
-## ⚙️ Configuration
-
-Create a `ghost_config.json` in your project root to customize behavior.
+⚙️ Configuration
+Create a ghost_config.json in your project root to customize behavior.
 
 JSON
 
-```json
 {
   "limits": {
     "max_asset_size_mb": 2.0,
@@ -84,17 +68,39 @@ JSON
   },
   "skip_dirs": ["my_secret_folder"]
 }
-```
-
-## 🏗 Architecture
-
-- **Config Manager:** Singleton pattern with thread-safe cached sets.
-- **File Locking:** Cross-platform advisory locks (fcntl / msvcrt) to prevent race conditions.
-- **Queue System:** Decoupled file watching (watchdog) from I/O operations using a thread-safe queue.
-- **Atomic Writes:** All file modifications use temporary files + os.replace for data integrity.
-
-## 📝 License
-
+🏗 Architecture
+Config Manager: Singleton pattern with thread-safe cached sets.
+File Locking: Cross-platform advisory locks (fcntl / msvcrt) to prevent race conditions.
+Queue System: Decoupled file watching (watchdog) from I/O operations using a thread-safe queue.
+Atomic Writes: All file modifications use temporary files + os.replace for data integrity.
+📝 License
 MIT License - see LICENSE file for details.
 
 Made with 🧠 and a bit of 🍅.
+
+text
+
+
+### 3. LICENSE (Новый файл)
+```text
+MIT License
+
+Copyright (c) 2023 Lazy Vibe Coder
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
