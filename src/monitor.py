@@ -12,6 +12,8 @@ from .config import Config, VERSION
 from .scanner import ProjectScanner
 from .ai_reviewer import AIReviewer
 from .analyzer import CodeAnalyzer
+from .watcher import VibeWatcher, Observer
+from .core import logger
 
 # Настройка таймзоны Ekaterinburg (+5)
 EKB_TZ = timezone(timedelta(hours=5))
@@ -20,9 +22,13 @@ COST_PER_M_TOKENS = 3.0
 SCAN_INTERVAL_SECONDS = 30
 
 class Monitor:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, worker_thread, task_queue, shutdown_event, ignore_mgr, scanner):
         self.root = root
-        self.scanner = ProjectScanner(root)
+        self.scanner = scanner # Передаем готовый сканер
+        self.worker_thread = worker_thread
+        self.task_queue = task_queue
+        self.shutdown_event = shutdown_event
+        self.ignore_mgr = ignore_mgr
         self.cfg = Config.get()
         self.console = Console()
         
@@ -31,7 +37,7 @@ class Monitor:
         self.analyzer = CodeAnalyzer(root)
         
         self.last_prompt_status = "No prompt"
-        self.command_queue = [] 
+        self.observer = None
 
     def _get_time_str(self):
         return datetime.now(EKB_TZ).strftime("%H:%M:%S")
@@ -73,8 +79,6 @@ class Monitor:
         table_top = Table(box=None, expand=True, show_header=True)
         table_top.add_column("File", style="magenta")
         table_top.add_column("Tokens", style="yellow", justify="right")
-        
-        # Заглушка данных (реальный анализ будет медленным)
         table_top.add_row("scanner.py", "5.2K")
         table_top.add_row("config.py", "1.8K")
         
@@ -91,7 +95,6 @@ class Monitor:
         return layout
 
     def _handle_input(self):
-        """Обработка ввода (Windows only)"""
         if sys.platform != "win32":
             return 
         
@@ -116,23 +119,53 @@ class Monitor:
                 self.console.print(report)
 
     def start(self):
-        # Initial scan
-        self.scanner.scan_full_project()
-        
-        with Live(self._generate_layout(), console=self.console, refresh_per_second=1) as live:
-            last_scan = time.time()
-            
-            self.console.print("\n[bold cyan]CONTROLS:[/bold cyan] [1] AI Review  [2] Copy Prompt  [3] Full Check")
-            
-            try:
-                while True:
-                    now = time.time()
-                    if now - last_scan > SCAN_INTERVAL_SECONDS:
-                        self.scanner.scan_full_project()
-                        last_scan = now
-                    
-                    live.update(self._generate_layout())
-                    self._handle_input()
-                    time.sleep(0.1)
-            except KeyboardInterrupt:
-                self.console.print("\n[yellow]Ghost stopped.[/yellow]")
+        # Запуск наблюдателя
+        self.observer = Observer()
+        event_handler = VibeWatcher(self.root, self.task_queue, self.ignore_mgr)
+        self.observer.schedule(event_handler, str(self.root), recursive=True)
+        self.observer.start()
+
+        if not self.observer.is_alive():
+            logger.error("[Ghost] Observer failed to start.")
+            self.console.print("[red]❌ Ghost failed to start.[/red]")
+            return
+
+        logger.info("[Ghost] Watching for file changes...")
+        self.console.print("[green]✅ Ghost is now watching your project[/green]")
+        self.console.print("[dim]Press Ctrl+C to stop[/dim]")
+
+        try:
+            with Live(self._generate_layout(), console=self.console, refresh_per_second=1) as live:
+                last_scan = time.time()
+                last_ai_refresh = time.time()
+                
+                self.console.print("\n[bold cyan]CONTROLS:[/bold cyan] [1] AI Review  [2] Copy Prompt  [3] Full Check")
+                
+                try:
+                    while self.observer.is_alive():
+                        now = time.time()
+                        
+                        # Обновление UI каждые 2 сек, чтобы видеть изменения AI статуса
+                        if now - last_ai_refresh > 2.0:
+                            live.update(self._generate_layout())
+                            last_ai_refresh = now
+                            
+                        # Скан проекта каждые 30 сек
+                        if now - last_scan > SCAN_INTERVAL_SECONDS:
+                            self.scanner.scan_full_project()
+                            last_scan = now
+                        
+                        self._handle_input()
+                        time.sleep(0.1)
+                except KeyboardInterrupt:
+                    logger.info("[Ghost] Shutting down...")
+                    self.shutdown_event.set()
+                    self.observer.stop()
+                self.observer.join()
+            self.console.print("\n[yellow]Ghost stopped.[/yellow]")
+        except Exception as e:
+            logger.error(f"Monitor error: {e}")
+            self.console.print(f"\n[red]Error: {e}[/red]")
+            if self.observer:
+                self.observer.stop()
+                self.observer.join()

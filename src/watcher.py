@@ -11,9 +11,10 @@ from .core import logger
 from .utils import move_to_trash
 
 class VibeWatcher(FileSystemEventHandler):
-    def __init__(self, root: Path, task_queue: queue.Queue):
+    def __init__(self, root: Path, task_queue: queue.Queue, ignore_mgr=None):
         self.root = root
         self.task_queue = task_queue
+        self.ignore_mgr = ignore_mgr
         cfg = Config.get()
         self.ignore_files = {
             root / cfg.gitignore_file, 
