@@ -50,9 +50,10 @@ class Monitor:
             Layout(name="logs", ratio=1)
         )
 
-        # Header (исправлено: правильное закрытие тегов)
+        # Header (исправлено: упрощенный стиль без вложенных тегов)
+        title_text = f"👻 Ghost Protocol v{VERSION} | Status: GUARDIAN ACTIVE"
         layout["header"].update(
-            Panel(f"👻 [bold]Ghost Protocol v{VERSION}[/bold] | Status: [bold green]GUARDIAN ACTIVE[/green][/bold]", style="black on #1e1e1e")
+            Panel(title_text, style="bold cyan on #1e1e1e")
         )
 
         # Col 1: Stats
