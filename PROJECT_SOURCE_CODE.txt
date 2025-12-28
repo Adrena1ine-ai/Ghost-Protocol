@@ -1,0 +1,869 @@
+================================================================================
+GHOST PROTOCOL - ПОЛНЫЙ ИСХОДНЫЙ КОД ПРОЕКТА
+================================================================================
+Версия: 1.0.3
+Дата создания: 2025-12-28
+
+Этот файл содержит все ключевые файлы проекта Ghost Protocol.
+Исключены: dist/, ghost_protocol.egg-info/, __pycache__/, документация и сервисные файлы.
+
+================================================================================
+
+ФАЙЛ: main.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\main.py
+================================================================================
+
+import argparse
+import sys
+import threading
+import queue
+from pathlib import Path
+
+try:
+    from src.watcher import VibeWatcher, Observer, process_queue
+    from src.scanner import ProjectScanner
+    from src.pruner import Pruner
+    from src.monitor import Monitor
+    from src.ignore_manager import IgnoreFileManager
+    from src.core import console, logger
+    from src.config import Config, VERSION
+except ImportError as e:
+    print(f"Error: {e}. Run from project root.", file=sys.stderr)
+    sys.exit(1)
+
+def install_hook(root: Path):
+    Config.init(root)
+    hooks = root / ".git" / "hooks"
+    if not hooks.exists():
+        console.print("[red]Not a git repo.[/red]")
+        return
+    
+    hook = hooks / "pre-commit"
+    python_exec = sys.executable
+    script_path = root / "main.py"
+    
+    script_content = f"""#!/bin/sh
+# Ghost Protocol Pre-Commit Hook
+"{python_exec}" "{script_path}" --commit-check
+"""
+    hook.write_text(script_content, encoding="utf-8")
+    hook.chmod(0o755)
+    console.print("[green]✅ Hook Installed[/green]")
+
+def run_commit_check(root: Path):
+    try:
+        Config.init(root)
+        Pruner(root).cleanup()
+        scanner = ProjectScanner(root)
+        if not scanner.scan_staged():
+            sys.exit(1)
+        sys.exit(0)
+    except Exception as e:
+        logger.error(f"Commit check failed: {e}")
+        sys.exit(1)
+
+def run_ghost_mode(root: Path):
+    console.print(f"[bold cyan]👻 Ghost Protocol v{VERSION} Activated[/bold cyan]")
+    Config.init(root)
+    
+    ignore_mgr = IgnoreFileManager(root)
+    task_queue = queue.Queue(maxsize=5000)
+    shutdown_event = threading.Event()
+    
+    worker_thread = threading.Thread(
+        target=process_queue, 
+        args=(root, task_queue, shutdown_event, ignore_mgr), 
+        daemon=True
+    )
+    worker_thread.start()
+    
+    # VibeWatcher now takes only root and queue
+    event_handler = VibeWatcher(root, task_queue)
+    observer = Observer()
+    observer.schedule(event_handler, str(root), recursive=True)
+    observer.start()
+    
+    if not observer.is_alive():
+        logger.error("[Ghost] Observer failed to start. Check if the directory exists and is accessible.")
+        console.print("[red]❌ Ghost failed to start. Check logs above.[/red]")
+        return
+
+    logger.info("[Ghost] Watching for file changes...")
+    console.print("[green]✅ Ghost is now watching your project[/green]")
+    console.print("[dim]Press Ctrl+C to stop[/dim]")
+
+    try:
+        while observer.is_alive():
+            observer.join(1)
+    except KeyboardInterrupt:
+        logger.info("[Ghost] Shutting down...")
+        shutdown_event.set()
+        observer.stop()
+    observer.join()
+    console.print("[yellow]Ghost stopped.[/yellow]")
+
+def run_monitor(root: Path):
+    Config.init(root)
+    Monitor(root).start()
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--install", action="store_true", help="Install git hook")
+    parser.add_argument("--ghost", action="store_true", help="Run background watcher")
+    parser.add_argument("--monitor", action="store_true", help="Show stats dashboard")
+    parser.add_argument("--commit-check", action="store_true", help="Internal: Git hook")
+    args = parser.parse_args()
+    root = Path.cwd()
+
+    if args.install:
+        install_hook(root)
+    elif args.ghost:
+        run_ghost_mode(root)
+    elif args.monitor:
+        run_monitor(root)
+    elif args.commit_check:
+        run_commit_check(root)
+    else:
+        parser.print_help()
+
+if __name__ == "__main__":
+    main()
+
+================================================================================
+
+ФАЙЛ: src/__init__.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\__init__.py
+================================================================================
+
+"""
+Ghost Protocol
+The automated guardian of your codebase.
+"""
+
+__version__ = "1.0.3"
+__author__ = "Lazy Vibe Coder"
+__all__ = ["Config", "IgnoreFileManager", "ProjectScanner"]
+
+================================================================================
+
+ФАЙЛ: src/__main__.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\__main__.py
+================================================================================
+
+"""
+Ghost Protocol - Entry point for python -m src
+"""
+import sys
+from pathlib import Path
+
+# Add parent directory to path to import main
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from main import main
+
+if __name__ == "__main__":
+    main()
+
+================================================================================
+
+ФАЙЛ: src/config.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\config.py
+================================================================================
+
+import json
+import copy
+import logging
+from pathlib import Path
+from typing import Set, Dict, Any, List, Optional
+
+logger = logging.getLogger("ghost.config")
+
+VERSION = "1.0.3"
+
+DEFAULT_CONFIG = {
+    "limits": {
+        "max_asset_size_mb": 1.0,
+        "max_code_size_mb": 0.5,
+        "debounce_seconds": 0.5,
+        "bytes_per_token": 4
+    },
+    "skip_dirs": [
+        "venv", ".venv", "env", ".env", "node_modules", "__pycache__", 
+        ".git", ".idea", ".vscode", ".DS_Store", "coverage", "dist", "build",
+        "target", "out", "bin", "obj", "lib", ".cursor", ".logs"
+    ],
+    "extensions": {
+        "garbage": [
+            ".log", ".sqlite", ".db", ".csv", ".tsv", 
+            ".zip", ".rar", ".7z", ".mp4", ".mov", ".avi", ".mp3", 
+            ".pdf", ".exe", ".dll", ".bin", ".dat", ".tmp", ".bak", ".swp", 
+            ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".webp",
+            ".tar.gz"
+        ],
+        "code": [".py", ".js", ".ts", ".tsx", ".jsx", ".html", ".css", ".scss", 
+                ".java", ".c", ".cpp", ".rs", ".go", ".php", ".rb", ".md", ".txt", ".yml", ".yaml", ".json"]
+    }
+}
+
+class Config:
+    _instance: Optional['Config'] = None
+
+    def __init__(self, root: Path):
+        self.root = root
+        self._data = copy.deepcopy(DEFAULT_CONFIG)
+        self._rebuild_caches()
+        self._load_user_config()
+
+    def _rebuild_caches(self):
+        self._skip_dirs_cache: Set[str] = set(self._data['skip_dirs'])
+        self._garbage_ext_cache: Set[str] = set(self._data['extensions']['garbage'])
+        self._code_ext_cache: Set[str] = set(self._data['extensions']['code'])
+
+    def _load_user_config(self):
+        config_path = self.root / "ghost_config.json"
+        if not config_path.exists():
+            return
+            
+        try:
+            user_cfg = json.loads(config_path.read_text())
+            
+            if 'skip_dirs' in user_cfg:
+                self._data['skip_dirs'] = list(set(
+                    self._data['skip_dirs'] + user_cfg['skip_dirs']
+                ))
+            
+            if 'limits' in user_cfg:
+                self._data['limits'].update(user_cfg['limits'])
+            
+            if 'extensions' in user_cfg:
+                u_ext = user_cfg['extensions']
+                if 'garbage' in u_ext:
+                    self._data['extensions']['garbage'] = list(set(
+                        self._data['extensions']['garbage'] + u_ext['garbage']
+                    ))
+                if 'code' in u_ext:
+                    self._data['extensions']['code'] = list(set(
+                        self._data['extensions']['code'] + u_ext['code']
+                    ))
+            
+            self._rebuild_caches()
+            
+        except (json.JSONDecodeError, IOError) as e:
+            logger.warning(f"Failed to load config: {e}. Using defaults.")
+
+    @classmethod
+    def init(cls, root: Path):
+        if cls._instance is None:
+            cls._instance = cls(root)
+
+    @classmethod
+    def get(cls) -> 'Config':
+        if cls._instance is None:
+            raise RuntimeError("Config not initialized. Call Config.init(root) first.")
+        return cls._instance
+
+    @property
+    def max_asset_size_mb(self) -> float: return self._data['limits']['max_asset_size_mb']
+    @property
+    def max_code_size_mb(self) -> float: return self._data['limits']['max_code_size_mb']
+    @property
+    def debounce_seconds(self) -> float: return self._data['limits']['debounce_seconds']
+    @property
+    def bytes_per_token(self) -> int: return self._data['limits']['bytes_per_token']
+    
+    @property
+    def skip_dirs(self) -> Set[str]: return self._skip_dirs_cache
+    @property
+    def garbage_extensions(self) -> Set[str]: return self._garbage_ext_cache
+    @property
+    def code_extensions(self) -> Set[str]: return self._code_ext_cache
+
+    @property
+    def gitignore_file(self) -> str: return ".gitignore"
+    @property
+    def cursorignore_file(self) -> str: return ".cursorignore"
+    @property
+    def cache_file(self) -> str: return ".ghost_stats.json"
+    @property
+    def ghost_tag(self) -> str: return "# ghost: auto"
+
+================================================================================
+
+ФАЙЛ: src/core.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\core.py
+================================================================================
+
+import logging
+from rich.console import Console
+from rich.logging import RichHandler
+
+console = Console()
+
+def setup_logger():
+    logging.basicConfig(
+        level="INFO",
+        format="%(message)s",
+        datefmt="[%X]",
+        handlers=[RichHandler(rich_tracebacks=True, show_path=False)]
+    )
+    return logging.getLogger("ghost")
+
+logger = setup_logger()
+
+================================================================================
+
+ФАЙЛ: src/utils.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\utils.py
+================================================================================
+
+import os
+import sys
+import contextlib
+from pathlib import Path
+from typing import Optional, IO
+
+_FCNTL = None
+_MSVCRT = None
+
+if sys.platform != "win32":
+    try:
+        import fcntl as _fcntl_module
+        _FCNTL = _fcntl_module
+    except ImportError:
+        pass
+else:
+    try:
+        import msvcrt as _msvcrt_module
+        _MSVCRT = _msvcrt_module
+    except ImportError:
+        pass
+
+@contextlib.contextmanager
+def interprocess_lock(target_file: Path):
+    lock_path = target_file.with_name(f"{target_file.name}.lock")
+    lock_fp: Optional[IO] = None
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        mode = 'a+b' if _MSVCRT else 'a+'
+        lock_fp = open(lock_path, mode)
+        if _FCNTL:
+            _FCNTL.flock(lock_fp.fileno(), _FCNTL.LOCK_EX)
+        elif _MSVCRT:
+            _MSVCRT.locking(lock_fp.fileno(), _MSVCRT.LK_LOCK, 1)
+        yield
+    finally:
+        if lock_fp:
+            try:
+                if _FCNTL:
+                    _FCNTL.flock(lock_fp.fileno(), _FCNTL.LOCK_UN)
+                elif _MSVCRT:
+                    _MSVCRT.locking(lock_fp.fileno(), _MSVCRT.LK_UNLCK, 1)
+                lock_fp.close()
+            except Exception:
+                pass
+
+def atomic_write(path: Path, content: str):
+    temp_path = path.with_name(f".{path.name}.tmp")
+    temp_path.write_text(content, encoding="utf-8")
+    os.replace(temp_path, path)
+
+================================================================================
+
+ФАЙЛ: src/watcher.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\watcher.py
+================================================================================
+
+import time
+import threading
+import queue
+from pathlib import Path
+from typing import Dict, Set
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
+
+from .config import Config
+from .core import logger
+
+class VibeWatcher(FileSystemEventHandler):
+    def __init__(self, root: Path, task_queue: queue.Queue):
+        self.root = root
+        self.task_queue = task_queue
+        cfg = Config.get()
+        self.ignore_files = {
+            root / cfg.gitignore_file, 
+            root / cfg.cursorignore_file
+        }
+
+    def _enqueue(self, path: Path):
+        if path in self.ignore_files: return
+        try:
+            rel_path = path.relative_to(self.root)
+        except ValueError:
+            return
+            
+        cfg = Config.get()
+        if any(part in cfg.skip_dirs for part in rel_path.parts): return
+        if path.name.startswith("."): return
+        
+        self.task_queue.put(("check", path))
+
+    def on_created(self, event):
+        if not event.is_directory: self._enqueue(Path(event.src_path))
+    def on_moved(self, event):
+        if not event.is_directory: self._enqueue(Path(event.dest_path))
+    def on_modified(self, event):
+        if not event.is_directory: self._enqueue(Path(event.src_path))
+
+def get_extension(path: Path) -> str:
+    s = path.suffix.lower()
+    if s == ".gz" and path.name.lower().endswith(".tar.gz"): return ".tar.gz"
+    return s
+
+def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading.Event, ignore_mgr):
+    # ignore_mgr passed here for usage in batch_add_to_ignore logic
+    pending_files: Dict[str, float] = {} 
+    MAX_PENDING = 1000
+    
+    while not shutdown_event.is_set():
+        try:
+            cmd, path = task_queue.get(timeout=0.1)
+            file_str = str(path)
+            pending_files[file_str] = time.time()
+            
+            if len(pending_files) > MAX_PENDING:
+                oldest = sorted(pending_files, key=pending_files.get)[:len(pending_files)//2]
+                for k in oldest: del pending_files[k]
+        except queue.Empty: pass
+        
+        now = time.time()
+        ready_files: Set[str] = set()
+        
+        for f_str, timestamp in list(pending_files.items()):
+            if now - timestamp > Config.get().debounce_seconds:
+                ready_files.add(f_str)
+                del pending_files[f_str]
+        
+        if ready_files:
+            assets_to_ignore = set()
+            cfg = Config.get()
+            
+            for f_str in ready_files:
+                path = Path(f_str)
+                if not path.exists(): continue
+                
+                try:
+                    size_mb = path.stat().st_size / (1024 * 1024)
+                    ext = get_extension(path)
+
+                    if size_mb > cfg.max_asset_size_mb:
+                        if ext in cfg.garbage_extensions:
+                            rel_path = str(path.relative_to(root)).replace("\\", "/")
+                            assets_to_ignore.add(rel_path)
+                            continue
+
+                    if size_mb > cfg.max_code_size_mb and ext in cfg.code_extensions:
+                        logger.warning(f"[WARN] Heavy code: {path.name} ({size_mb:.2f} MB)")
+                except OSError: pass
+            
+            if assets_to_ignore: 
+                ignore_mgr.add_entries(assets_to_ignore)
+
+================================================================================
+
+ФАЙЛ: src/scanner.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\scanner.py
+================================================================================
+
+import json
+import subprocess
+import os
+import sys
+import time
+from pathlib import Path
+from typing import Dict, Any, List
+from .config import Config
+from .core import console, logger
+from .utils import atomic_write
+
+class ProjectScanner:
+    def __init__(self, root: Path):
+        self.root = root
+        cfg = Config.get()
+        self.cache_path = self.root / cfg.cache_file
+
+    def scan_staged(self) -> bool:
+        try:
+            output = subprocess.check_output(
+                ["git", "diff", "--cached", "--name-only", "-z"],
+                cwd=self.root,
+                stderr=subprocess.PIPE,
+                text=True,
+                timeout=30
+            )
+        except subprocess.TimeoutExpired:
+            logger.error("[CRITICAL] Git command timed out.")
+            console.print("[bold red]⛔ COMMIT BLOCKED: Git timeout (30s).[/bold red]")
+            return False
+        except subprocess.CalledProcessError as e:
+            logger.error(f"[CRITICAL] Git failed: {e.stderr}")
+            console.print("[bold red]⛔ COMMIT BLOCKED: Git status check failed.[/bold red]")
+            return False
+        except FileNotFoundError:
+            logger.error("[CRITICAL] Git not found.")
+            console.print("[bold red]⛔ COMMIT BLOCKED: Git not found.[/bold red]")
+            return False
+
+        if not output: return True
+        
+        staged_files = output.split('\x00')
+        cfg = Config.get()
+        code_violations: List[str] = []
+
+        for f_str in staged_files:
+            if not f_str: continue
+            file_path = self.root / f_str
+            try:
+                if not file_path.is_file(): continue
+                suffix = file_path.suffix.lower()
+                if suffix in cfg.code_extensions:
+                    size_mb = file_path.stat().st_size / (1024 * 1024)
+                    if size_mb > cfg.max_code_size_mb:
+                        code_violations.append(f"{f_str} ({size_mb:.2f} MB)")
+            except OSError: continue
+
+        if code_violations:
+            console.print("[bold red]⛔ COMMIT BLOCKED: Giant source files detected![/bold red]")
+            for v in code_violations: console.print(f"   - {v}")
+            return False
+        return True
+
+    def scan_full_project(self) -> bool:
+        total_bytes = 0
+        file_count = 0
+        cfg = Config.get()
+        
+        try:
+            for root_dir, dirs, files in os.walk(self.root):
+                dirs[:] = [d for d in dirs if d not in cfg.skip_dirs and not d.startswith(".")]
+                for file in files:
+                    file_path = Path(root_dir) / file
+                    if file.startswith(".ghost"): continue
+                    try:
+                        total_bytes += file_path.stat().st_size
+                        file_count += 1
+                    except OSError: continue
+
+            stats: Dict[str, Any] = {
+                "total_tokens": total_bytes // cfg.bytes_per_token,
+                "files_count": file_count,
+                "last_scan": time.time()
+            }
+            atomic_write(self.cache_path, json.dumps(stats))
+        except Exception as e:
+            logger.debug(f"Stats scan error (non-critical): {e}")
+        return True
+
+    def get_stats(self) -> Dict[str, Any]:
+        if self.cache_path.exists():
+            try: return json.loads(self.cache_path.read_text())
+            except (IOError, json.JSONDecodeError): pass
+        return {"total_tokens": 0, "files_count": 0, "last_scan": 0}
+
+================================================================================
+
+ФАЙЛ: src/pruner.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\pruner.py
+================================================================================
+
+from pathlib import Path
+from .ignore_manager import IgnoreFileManager
+from .core import logger
+
+class Pruner:
+    def __init__(self, root: Path):
+        self.root = root
+        self.ignore_mgr = IgnoreFileManager(root)
+
+    def cleanup(self):
+        """Run cleanup on all ignore files"""
+        try:
+            self.ignore_mgr.prune_stale()
+        except Exception as e:
+            logger.error(f"Prune failed: {e}")
+            raise
+
+================================================================================
+
+ФАЙЛ: src/ignore_manager.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\ignore_manager.py
+================================================================================
+
+from pathlib import Path
+from typing import List, Set
+from .config import Config
+from .core import logger
+from .utils import interprocess_lock, atomic_write
+
+class IgnoreFileManager:
+    """Centralized manager for .gitignore and .cursorignore operations."""
+    
+    def __init__(self, root: Path):
+        self.root = root
+        self.cfg = Config.get()
+        self.targets = [
+            self.root / self.cfg.gitignore_file, 
+            self.root / self.cfg.cursorignore_file
+        ]
+
+    def add_entries(self, paths_to_add: Set[str]):
+        """Add paths to ignore files with safety tags."""
+        if not paths_to_add: return
+
+        total_added_count = 0
+
+        for target in self.targets:
+            target.touch(exist_ok=True)
+            
+            with interprocess_lock(target):
+                content = target.read_text(encoding="utf-8")
+                current_lines = set(content.splitlines())
+                
+                new_entries = []
+                for p in paths_to_add:
+                    ghost_line = f"{p}  {self.cfg.ghost_tag}"
+                    if ghost_line not in current_lines and p not in current_lines:
+                        new_entries.append(ghost_line)
+
+                if new_entries:
+                    if content and not content.endswith('\n'): content += '\n'
+                    content += "\n".join(new_entries) + "\n"
+                    atomic_write(target, content)
+                    total_added_count += len(new_entries)
+        
+        if total_added_count > 0:
+            # Since we write to both files, total_added_count will be sum of entries in both files.
+            # If entries are identical in both files, it's effectively 2x paths_to_add.
+            # We'll just log the action fact.
+            logger.info(f"[Ghost] Updated ignore files with {len(paths_to_add)} new assets.")
+
+    def prune_stale(self):
+        """Remove ghost-tagged lines for files that no longer exist."""
+        for target in self.targets:
+            self._prune_file(target)
+
+    def _prune_file(self, target: Path):
+        if not target.exists(): return
+        
+        try:
+            with interprocess_lock(target):
+                content = target.read_text(encoding="utf-8")
+                lines = content.splitlines()
+                new_lines: List[str] = []
+                removed_count = 0
+
+                for line in lines:
+                    stripped = line.strip()
+                    if not stripped or stripped.startswith("#"):
+                        new_lines.append(line)
+                        continue
+                    
+                    if stripped.endswith(self.cfg.ghost_tag):
+                        original_path = stripped.replace(self.cfg.ghost_tag, "").strip()
+                        if (self.root / original_path).exists():
+                            new_lines.append(line)
+                        else:
+                            removed_count += 1
+                    else:
+                        new_lines.append(line)
+
+                if removed_count > 0:
+                    new_content = "\n".join(new_lines)
+                    if not new_content.endswith('\n'): new_content += '\n'
+                    atomic_write(target, new_content)
+                    logger.info(f"[Ghost] Pruned {removed_count} rules from {target.name}")
+        except Exception as e:
+            logger.error(f"Prune error: {e}")
+            raise
+
+================================================================================
+
+ФАЙЛ: src/monitor.py
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\src\monitor.py
+================================================================================
+
+import time
+from pathlib import Path
+from rich.layout import Layout
+from rich.panel import Panel
+from rich.table import Table
+from rich.console import Console
+from rich.live import Live
+from .config import Config, VERSION
+from .scanner import ProjectScanner
+
+COST_PER_M_TOKENS = 3.0
+SCAN_INTERVAL_SECONDS = 30
+
+class Monitor:
+    def __init__(self, root: Path):
+        self.root = root
+        self.scanner = ProjectScanner(root)
+        self.cfg = Config.get()
+
+    def _generate_layout(self) -> Layout:
+        stats = self.scanner.get_stats()
+        layout = Layout()
+        layout.split(Layout(name="header", size=3), Layout(name="body", ratio=1))
+        layout["body"].split_row(Layout(name="stats", ratio=1), Layout(name="info", ratio=1))
+
+        layout["header"].update(
+            Panel(f"👻 [bold]Ghost Protocol v{VERSION}[/bold] | Status: [bold green]ACTIVE[/bold green]", style="white on blue")
+        )
+
+        table = Table(box=None, expand=True, show_header=False)
+        table.add_column("Metric", style="cyan")
+        table.add_column("Value", style="bold green")
+        
+        tokens = stats.get('total_tokens', 0)
+        table.add_row("Total Tokens", f"{tokens:,}")
+        table.add_row("Files Tracked", str(stats.get('files_count', 0)))
+        table.add_row("Est. Cost ($3/M)", f"${(tokens / 1_000_000) * COST_PER_M_TOKENS:.4f}")
+        
+        layout["stats"].update(Panel(table, title="📊 Project Stats"))
+
+        info_text = (
+            "[bold cyan]System Status:[/bold cyan]\n"
+            "• Writer: IgnoreManager (DRY)\n"
+            "• Scanner: Auto-updating (30s)\n"
+            "• Config: Cached & Valid\n\n"
+            "[dim]Press Ctrl+C to exit.[/dim]"
+        )
+        layout["info"].update(Panel(info_text, title="🧠 The Brain"))
+        return layout
+
+    def start(self):
+        console = Console()
+        
+        # Initial scan on startup to ensure we have data
+        self.scanner.scan_full_project()
+        
+        with Live(self._generate_layout(), console=console, refresh_per_second=1) as live:
+            last_scan = time.time()
+            try:
+                while True:
+                    now = time.time()
+                    if now - last_scan > SCAN_INTERVAL_SECONDS:
+                        self.scanner.scan_full_project()
+                        last_scan = now
+                    
+                    live.update(self._generate_layout())
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Ghost monitor paused.[/yellow]")
+
+================================================================================
+
+КОНФИГУРАЦИОННЫЕ ФАЙЛЫ
+================================================================================
+
+ФАЙЛ: pyproject.toml
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\pyproject.toml
+================================================================================
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ghost-protocol"
+version = "1.0.3"
+description = "The automated guardian of your sanity. Auto-ignores junk & protects repos."
+readme = "README.md"
+requires-python = ">=3.8"
+license = "MIT"
+license-files = ["LICEN[CS]E*"]
+authors = [
+    {name = "Lazy Vibe Coder", email = "ghost@vibe.com"},
+]
+keywords = ["git", "automation", "pre-commit", "developer-tools", "vibe", "cursor", "ai-assistant"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Version Control :: Git",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
+
+dependencies = [
+    "rich>=13.0.0",
+    "watchdog>=3.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "mypy"]
+
+[project.scripts]
+ghost = "main:main"
+
+[project.urls]
+Homepage = "https://github.com/Adrena1ine-ai/Ghost-Protocol"
+Repository = "https://github.com/Adrena1ine-ai/Ghost-Protocol"
+"Bug Tracker" = "https://github.com/Adrena1ine-ai/Ghost-Protocol/issues"
+
+[tool.setuptools]
+# Find packages in src/
+packages = {find = {}}
+# Include main.py as a top-level module
+py-modules = ["main"]
+
+[tool.setuptools.package-data]
+"*" = ["*.md", "*.txt", "*.json"]
+
+================================================================================
+
+ФАЙЛ: requirements.txt
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\requirements.txt
+================================================================================
+
+rich>=13.0.0
+watchdog>=3.0.0
+
+================================================================================
+
+ФАЙЛ: MANIFEST.in
+ПУТЬ: C:\Users\Antaras\Downloads\Ghost Protocol\MANIFEST.in
+================================================================================
+
+include README.md
+include LICENSE
+recursive-include src *.py
+
+================================================================================
+
+КОНЕЦ ФАЙЛА
+================================================================================
+Всего файлов: 13
+- main.py (точка входа)
+- src/__init__.py
+- src/__main__.py
+- src/config.py (конфигурация)
+- src/core.py (логирование)
+- src/utils.py (утилиты: блокировки, атомарная запись)
+- src/watcher.py (наблюдение за файлами)
+- src/scanner.py (сканирование проекта)
+- src/pruner.py (очистка)
+- src/ignore_manager.py (управление ignore-файлами)
+- src/monitor.py (монитор статистики)
+- pyproject.toml (конфигурация пакета)
+- requirements.txt (зависимости)
+- MANIFEST.in (манифест для сборки)
+
+================================================================================
+
