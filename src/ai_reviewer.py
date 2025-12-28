@@ -1,24 +1,56 @@
 import subprocess
 import pyperclip
-import google.generativeai as genai
 from pathlib import Path
 from .config import Config
 from .core import logger
+
+# Пробуем импортировать новую библиотеку, если не получается - используем старую
+try:
+    import google.genai as genai
+    USE_NEW_API = True
+except ImportError:
+    try:
+        import google.generativeai as genai
+        USE_NEW_API = False
+    except ImportError:
+        genai = None
+        USE_NEW_API = False
 
 class AIReviewer:
     def __init__(self, root: Path):
         self.root = root
         self.cfg = Config.get()
         
-        # Инициализация API
-        genai.configure(api_key=self.cfg.ai_api_key)
-        self.model = genai.GenerativeModel(self.cfg.ai_model)
+        if genai is None:
+            logger.warning("Neither google-genai nor google-generativeai is installed. AI Review will not work.")
+            self.model = None
+            self.client = None
+        else:
+            # Инициализация API
+            try:
+                if USE_NEW_API:
+                    # Новый API (google-genai) - если доступен
+                    self.client = genai.Client(api_key=self.cfg.ai_api_key)
+                    self.model = self.client.models.get(self.cfg.ai_model) if hasattr(self.client, 'models') else None
+                else:
+                    # Старый API (google-generativeai)
+                    genai.configure(api_key=self.cfg.ai_api_key)
+                    self.model = genai.GenerativeModel(self.cfg.ai_model)
+                    self.client = None
+            except Exception as e:
+                logger.warning(f"Failed to initialize AI client: {e}")
+                self.model = None
+                self.client = None
         
         self.last_generated_prompt = ""
         self.last_review_status = "Idle"
 
     def run_review(self):
         """Запускает ревью изменений (git diff) и генерирует промпт для исправления."""
+        if self.model is None:
+            self.last_review_status = "AI client not initialized. Check API key or install google-genai."
+            return
+            
         self.last_review_status = "Analyzing diff..."
         
         # Получаем diff
@@ -56,16 +88,25 @@ class AIReviewer:
         """
 
         try:
-            response = self.model.generate_content(review_prompt)
-            result_text = response.text.strip()
+            if USE_NEW_API and self.client:
+                # Новый API стиль
+                response = self.model.generate(prompt=review_prompt)
+                if hasattr(response, 'text'):
+                    result_text = response.text.strip()
+                elif hasattr(response, 'candidates') and response.candidates:
+                    result_text = response.candidates[0].content.parts[0].text.strip()
+                else:
+                    result_text = str(response).strip()
+            else:
+                # Старый API стиль (google-generativeai)
+                response = self.model.generate_content(review_prompt)
+                result_text = response.text.strip()
             
             if "CLEAN" in result_text.upper():
                 self.last_review_status = "Review: ✅ Code is clean"
                 self.last_generated_prompt = ""
             else:
                 self.last_review_status = "Review: ⚠️ Issues found. Prompt generated."
-                # Сохраняем промпт для копирования
-                # Очищаем ответ LLM, чтобы оставить только инструкцию для Cursor
                 self.last_generated_prompt = result_text
                 
         except Exception as e:

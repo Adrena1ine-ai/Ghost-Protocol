@@ -1,0 +1,306 @@
+Metadata-Version: 2.4
+Name: ghost-protocol
+Version: 1.1.3
+Summary: The automated guardian of your sanity. Auto-ignores junk & protects repos.
+Author-email: Adrena1ine <ghost@vibe.com>
+License-Expression: MIT
+Project-URL: Homepage, https://github.com/Adrena1ine-ai/Ghost-Protocol
+Project-URL: Repository, https://github.com/Adrena1ine-ai/Ghost-Protocol
+Project-URL: Bug Tracker, https://github.com/Adrena1ine-ai/Ghost-Protocol/issues
+Keywords: git,automation,pre-commit,developer-tools,vibe,cursor,ai-assistant
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Environment :: Console
+Classifier: Intended Audience :: Developers
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Software Development :: Version Control :: Git
+Classifier: Topic :: Software Development :: Libraries :: Python Modules
+Classifier: Topic :: Utilities
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: rich>=13.0.0
+Requires-Dist: watchdog>=3.0.0
+Requires-Dist: pyperclip>=1.8.0
+Requires-Dist: google-generativeai>=0.3.0
+Provides-Extra: dev
+Requires-Dist: pytest; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: mypy; extra == "dev"
+Dynamic: license-file
+
+<div align="center">
+
+# 👻 Ghost Protocol
+
+### *The silent guardian of your AI-assisted workflow*
+
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green?style=for-the-badge)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen?style=for-the-badge)](http://makeapullrequest.com)
+
+<br>
+
+**Stop wasting tokens on garbage files.**<br>
+**Stop committing 50MB SQLite databases.**<br>
+**Stop explaining to AI why your project has 847 PNG files.**
+
+<br>
+
+[Installation](#-installation) •
+[Quick Start](#-quick-start) •
+[Features](#-features) •
+[Configuration](#%EF%B8%8F-configuration)
+
+<br>
+
+[![PyPI version](https://img.shields.io/pypi/v/ghost-protocol?style=for-the-badge)](https://pypi.org/project/ghost-protocol/)
+
+</div>
+
+---
+
+## 🤔 The Problem
+
+You're vibe-coding with Claude/Cursor/Copilot. Life is good.
+
+Then you notice:
+- 💸 Token costs are through the roof
+- 🐌 AI responses are slow because context is bloated  
+- 😱 You accidentally committed a 200MB video file
+- 🔄 AI keeps "seeing" your `node_modules` or `__pycache__`
+
+**Ghost Protocol fixes all of this. Automatically. In the background.**
+
+---
+
+## ✨ Features
+
+| Feature | What it does |
+|---------|--------------|
+| 🚫 **Auto-Ignore** | Detects heavy files (images, videos, databases) and adds them to `.gitignore` + `.cursorignore` |
+| 🧹 **Self-Cleaning** | Removes stale entries when you delete the original files |
+| 🛡️ **Commit Guard** | Blocks `git commit` if you try to push oversized source files |
+| 📊 **Live Monitor** | Beautiful TUI dashboard showing token count & estimated API cost |
+| ⚡ **Zero Config** | Works out of the box. Sensible defaults. |
+| 🔇 **Silent** | Runs in background. No notifications. No interruptions. |
+
+---
+
+## 📦 Installation
+
+### From PyPI (Recommended)
+
+```bash
+pip install ghost-protocol
+```
+
+After installation, the `ghost` command will be available globally.
+
+### From Source
+
+```bash
+# Clone the repo
+git clone https://github.com/Adrena1ine-ai/Ghost-Protocol.git
+cd Ghost-Protocol
+
+# Install in development mode
+pip install -e .
+```
+
+---
+
+## 🚀 Quick Start
+
+**Three commands. That's it.**
+
+```bash
+# 1. Install the git hook (one time only)
+ghost --install
+
+# 2. Start the guardian daemon (run in background)
+ghost --ghost
+
+# 3. (Optional) Open the monitor in another terminal
+ghost --monitor
+```
+
+Now forget about it. Ghost Protocol handles the rest.
+
+---
+
+## 📊 The Monitor
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  👻 Ghost Protocol v21.0.0 | Status: ACTIVE                  │
+├─────────────────────────────┬────────────────────────────────┤
+│  📊 Project Stats           │  🧠 The Brain                  │
+│                             │                                │
+│  Total Tokens    1,247,832  │  • Writer: IgnoreManager (DRY) │
+│  Files Tracked        342   │  • Scanner: Auto-updating (30s)│
+│  Est. Cost ($3/M)  $3.74    │  • Config: Cached & Valid      │
+│                             │                                │
+│                             │  Press Ctrl+C to exit.         │
+└─────────────────────────────┴────────────────────────────────┘
+```
+
+---
+
+## ⚙️ Configuration
+
+Create `ghost_config.json` in your project root:
+
+```json
+{
+  "limits": {
+    "max_asset_size_mb": 1.0,
+    "max_code_size_mb": 0.5,
+    "debounce_seconds": 0.5
+  },
+  "skip_dirs": ["my_custom_folder", "secrets"],
+  "extensions": {
+    "garbage": [".custom", ".mybigfile"],
+    "code": [".mycode"]
+  }
+}
+```
+
+### Default Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `max_asset_size_mb` | 1.0 | Auto-ignore assets larger than this |
+| `max_code_size_mb` | 0.5 | Warn/block code files larger than this |
+| `debounce_seconds` | 0.5 | Wait time before processing file changes |
+
+### Pre-configured Skip Directories
+
+```
+venv, .venv, node_modules, __pycache__, .git, 
+.idea, .vscode, dist, build, coverage, target...
+```
+
+### Pre-configured Garbage Extensions
+
+```
+.log, .sqlite, .db, .zip, .mp4, .mp3, .pdf, 
+.png, .jpg, .gif, .exe, .dll, .bin...
+```
+
+---
+
+## 🏗️ How It Works
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────────┐
+│  Watchdog   │────▶│   Queue     │────▶│  IgnoreManager  │
+│  (Events)   │     │  (Debounce) │     │  (Atomic Write) │
+└─────────────┘     └─────────────┘     └─────────────────┘
+                                               │
+                                               ▼
+                                        ┌─────────────┐
+                                        │ .gitignore  │
+                                        │.cursorignore│
+                                        └─────────────┘
+```
+
+**Key Design Decisions:**
+- **Singleton Config** — Thread-safe, cached sets for O(1) lookups
+- **File Locking** — Cross-platform advisory locks (fcntl/msvcrt)
+- **Atomic Writes** — temp file → os.replace() for data integrity
+- **Fail-Closed** — Git hook blocks commit on any error
+
+---
+
+## 🧑‍💻 For Developers
+
+```bash
+# Project structure
+ghost-protocol/
+├── main.py              # Entry point & CLI
+├── requirements.txt     # Dependencies
+└── src/
+    ├── config.py        # Singleton configuration
+    ├── core.py          # Logger & console
+    ├── utils.py         # Atomic write, file locking
+    ├── watcher.py       # File system events → queue
+    ├── scanner.py       # Project stats & git integration
+    ├── pruner.py        # Cleanup stale ignore entries
+    ├── ignore_manager.py # DRY: single source for ignore logic
+    └── monitor.py       # Rich TUI dashboard
+```
+
+---
+
+## 🤝 Contributing
+
+PRs are welcome! Please:
+
+1. Fork the repo
+2. Create a feature branch (`git checkout -b feature/amazing`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing`)
+5. Open a Pull Request
+
+---
+
+## 🆘 Troubleshooting
+
+### Command `ghost` not found (Windows)
+
+This is a common issue on Windows when Python Scripts folder is not in PATH.
+
+**Quick fix - Use Python module instead:**
+```bash
+python -m src --install
+python -m src --ghost
+```
+
+**Permanent fix - Add Scripts to PATH:**
+
+1. Find your Scripts folder:
+   ```powershell
+   python -c "import site; import os; print(os.path.join(site.getuserbase(), 'Scripts'))"
+   ```
+
+2. Add to PATH temporarily:
+   ```powershell
+   $env:Path += ";C:\Users\YourName\AppData\Roaming\Python\Python314\Scripts"
+   ```
+
+3. Add to PATH permanently:
+   - Press `Win + R`, type `sysdm.cpl`, press Enter
+   - Go to **Advanced** → **Environment Variables**
+   - Under **User variables**, find `Path` → **Edit**
+   - Click **New** and add the Scripts path
+   - Click **OK** and restart your terminal
+
+### Other Issues
+
+- **Not a git repo**: Make sure you're in a git repository (`git init` if needed)
+- **Import errors**: Reinstall with `pip install --upgrade ghost-protocol`
+
+---
+
+## 📄 License
+
+MIT © 2024 — Do whatever you want with it.
+
+---
+
+<div align="center">
+
+**Made for vibe coders, by a vibe coder.**
+
+*Because life's too short to manually edit .gitignore*
+
+<br>
+
+⭐ Star this repo if Ghost saved your tokens ⭐
+
+</div>

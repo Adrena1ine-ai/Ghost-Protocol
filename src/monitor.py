@@ -54,7 +54,7 @@ class Monitor:
 
         # Header
         layout["header"].update(
-            Panel(f"👻 [bold]Ghost Protocol v{VERSION}[/bold] | Status: [bold green]GUARDIAN ACTIVE[/green]", style="black on #1e1e1e")
+            Panel(f"👻 [bold]Ghost Protocol v{VERSION}[/bold] | Status: [bold green]GUARDIAN ACTIVE[/green][/bold]", style="black on #1e1e1e")
         )
 
         # Col 1: Stats

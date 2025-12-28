@@ -6,7 +6,7 @@ from typing import Set, Dict, Any, List, Optional
 
 logger = logging.getLogger("ghost.config")
 
-VERSION = "1.1.3"
+VERSION = "1.1.4"
 
 DEFAULT_CONFIG = {
     "limits": {

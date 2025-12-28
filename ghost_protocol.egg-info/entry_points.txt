@@ -1,0 +1,2 @@
+[console_scripts]
+ghost = main:main
