@@ -65,6 +65,8 @@ class AIReviewer:
                 cwd=self.root,
                 stderr=subprocess.PIPE,
                 text=True,
+                encoding='utf-8',
+                errors='replace',  # Заменяем нечитаемые символы вместо краша
                 timeout=10
             )
         except subprocess.CalledProcessError:
