@@ -19,7 +19,7 @@ except ImportError as e:
 
 def ensure_dependencies():
     """Автоматическая установка недостающих зависимостей"""
-    deps = ["ruff", "radon", "pyperclip", "google-generativeai"]
+    deps = ["ruff", "radon", "pyperclip", "google-genai"]
     for dep in deps:
         try:
             __import__(dep)
