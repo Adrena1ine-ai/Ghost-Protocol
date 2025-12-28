@@ -90,7 +90,7 @@ def run_full_start(root: Path):
     monitor.start()
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Ghost Protocol - Automated guardian of your sanity")
     parser.add_argument("--install", action="store_true", help="Install git hook")
     parser.add_argument("--commit-check", action="store_true", help="Internal: Git hook")
     args = parser.parse_args()
