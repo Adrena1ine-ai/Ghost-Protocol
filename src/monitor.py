@@ -145,11 +145,9 @@ class Monitor:
                     while self.observer.is_alive():
                         now = time.time()
                         
-                        # Обновление UI каждые 2 сек, чтобы видеть изменения AI статуса
-                        if now - last_ai_refresh > 2.0:
-                            live.update(self._generate_layout())
-                            last_ai_refresh = now
-                            
+                        # Обновление UI каждый кадр для плавности
+                        live.update(self._generate_layout())
+                        
                         # Скан проекта каждые 30 сек
                         if now - last_scan > SCAN_INTERVAL_SECONDS:
                             self.scanner.scan_full_project()
