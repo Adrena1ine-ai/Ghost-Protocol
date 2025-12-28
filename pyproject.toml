@@ -11,7 +11,7 @@ requires-python = ">=3.8"
 license = "MIT"
 license-files = ["LICEN[CS]E*"]
 authors = [
-    {name = "Lazy Vibe Coder", email = "ghost@vibe.com"},
+    {name = "Adrena1ine", email = "ghost@vibe.com"},
 ]
 keywords = ["git", "automation", "pre-commit", "developer-tools", "vibe", "cursor", "ai-assistant"]
 classifiers = [
