@@ -48,7 +48,8 @@ class Monitor:
         
         layout.split(
             Layout(name="header", size=3),
-            Layout(name="body", ratio=1)
+            Layout(name="body", ratio=1),
+            Layout(name="footer", size=3)
         )
         layout["body"].split_row(
             Layout(name="stats", ratio=1),
@@ -91,6 +92,12 @@ class Monitor:
             f"[dim]Last AI Status: {self.ai_reviewer.get_status()}[/dim]"
         )
         layout["logs"].update(Panel(log_text, title="🧠 Activity Log (+5)", style="#1e1e1e on #000000"))
+        
+        # Footer with controls
+        controls_text = "[bold cyan]CONTROLS:[/bold cyan] [1] AI Review  [2] Copy Prompt  [3] Full Check  [dim](Press number keys)[/dim]"
+        layout["footer"].update(
+            Panel(controls_text, style="bold yellow on #1e1e1e")
+        )
         
         return layout
 
@@ -138,8 +145,6 @@ class Monitor:
             with Live(self._generate_layout(), console=self.console, refresh_per_second=1) as live:
                 last_scan = time.time()
                 last_ai_refresh = time.time()
-                
-                self.console.print("\n[bold cyan]CONTROLS:[/bold cyan] [1] AI Review  [2] Copy Prompt  [3] Full Check")
                 
                 try:
                     while self.observer.is_alive():

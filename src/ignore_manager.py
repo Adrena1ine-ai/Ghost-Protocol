@@ -14,6 +14,11 @@ class IgnoreFileManager:
             self.root / self.cfg.gitignore_file, 
             self.root / self.cfg.cursorignore_file
         ]
+    
+    def ensure_files_exist(self):
+        """Create ignore files if they don't exist."""
+        for target in self.targets:
+            target.touch(exist_ok=True)
 
     def add_entries(self, paths_to_add: Set[str]):
         """Add paths to ignore files with safety tags."""

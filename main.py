@@ -66,14 +66,25 @@ def run_full_start(root: Path):
                 except subprocess.CalledProcessError:
                     logger.error(f"[Setup] Failed to install {dep}. Some features may not work.")
 
-    # 3. Ignore Manager (Creates .cursorignore, .gitignore, _trash)
-    ignore_mgr = IgnoreFileManager(root)
+    # 3. Create _trash folder
+    trash_folder = root / Config.get().trash_folder
+    trash_folder.mkdir(exist_ok=True)
+    console.print(f"[green]✅[/green] Created/verified trash folder: [cyan]{Config.get().trash_folder}[/cyan]")
+    logger.info(f"[Ghost] Created/verified trash folder: {Config.get().trash_folder}")
 
-    # 4. Initial Scan (Stats & Token Count)
+    # 4. Ignore Manager (Creates .cursorignore, .gitignore)
+    ignore_mgr = IgnoreFileManager(root)
+    ignore_mgr.ensure_files_exist()
+    console.print(f"[green]✅[/green] Created/verified ignore files: [cyan].gitignore[/cyan], [cyan].cursorignore[/cyan]")
+    logger.info(f"[Ghost] Created/verified ignore files: .gitignore, .cursorignore")
+
+    # 5. Initial Scan (Stats & Token Count)
+    console.print("[yellow]🔍 Scanning project...[/yellow]")
     scanner = ProjectScanner(root)
     scanner.scan_full_project()
+    console.print("[green]✅ Project scan completed[/green]")
 
-    # 5. Watcher Thread (Background File System)
+    # 6. Watcher Thread (Background File System)
     task_queue = queue.Queue(maxsize=5000)
     shutdown_event = threading.Event()
     
@@ -83,8 +94,11 @@ def run_full_start(root: Path):
         daemon=True
     )
     worker_thread.start()
+    console.print("[green]✅ Background watcher thread started[/green]")
+    logger.info("[Ghost] Background watcher thread started")
     
-    # 6. UI Thread (Monitor - Frontend)
+    # 7. UI Thread (Monitor - Frontend)
+    console.print("[yellow]🚀 Starting monitor...[/yellow]\n")
     # Monitor теперь сам запускает watcher
     monitor = Monitor(root, worker_thread, task_queue, shutdown_event, ignore_mgr, scanner)
     monitor.start()
