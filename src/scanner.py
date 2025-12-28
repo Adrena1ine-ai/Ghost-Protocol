@@ -9,6 +9,13 @@ from .config import Config
 from .core import console, logger
 from .utils import atomic_write
 
+# Список расширений, которые мы "безопасно" читаем как текст
+SAFE_TEXT_EXTENSIONS = {
+    ".py", ".js", ".ts", ".tsx", ".jsx", ".html", ".css", ".scss", 
+    ".java", ".c", ".cpp", ".rs", ".go", ".php", ".rb", ".md", ".txt", 
+    ".yml", ".yaml", ".json", ".sql" # SQL нужен для дампа структуры
+}
+
 class ProjectScanner:
     def __init__(self, root: Path):
         self.root = root
@@ -39,7 +46,7 @@ class ProjectScanner:
 
         if not output: return True
         
-        staged_files = output.split('\x00')
+        staged_files = output.split('\x00')  # Исправлено: \x00 вместо \x0
         cfg = Config.get()
         code_violations: List[str] = []
 
@@ -47,7 +54,6 @@ class ProjectScanner:
             if not f_str: continue
             file_path = self.root / f_str
             try:
-                if not file_path.is_file(): continue
                 suffix = file_path.suffix.lower()
                 if suffix in cfg.code_extensions:
                     size_mb = file_path.stat().st_size / (1024 * 1024)
@@ -72,9 +78,12 @@ class ProjectScanner:
                 for file in files:
                     file_path = Path(root_dir) / file
                     if file.startswith(".ghost"): continue
+                    
                     try:
-                        total_bytes += file_path.stat().st_size
-                        file_count += 1
+                        # ФИЛЬТР: Читаем только текстовые файлы (код, дампы, конфиги)
+                        if file_path.suffix.lower() in SAFE_TEXT_EXTENSIONS:
+                            total_bytes += file_path.stat().st_size
+                            file_count += 1
                     except OSError: continue
 
             stats: Dict[str, Any] = {

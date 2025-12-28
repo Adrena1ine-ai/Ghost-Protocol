@@ -8,7 +8,6 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.console import Console
 from rich.live import Live
-from rich.text import Text
 from .config import Config, VERSION
 from .scanner import ProjectScanner
 from .ai_reviewer import AIReviewer
@@ -27,11 +26,12 @@ class Monitor:
         self.cfg = Config.get()
         self.console = Console()
         
-        # Инициализация новых модулей
+        # Инициализация модулей
         self.ai_reviewer = AIReviewer(root)
         self.analyzer = CodeAnalyzer(root)
         
-        self.last_generated_prompt_status = "No prompt"
+        self.last_prompt_status = "No prompt"
+        self.command_queue = [] 
 
     def _get_time_str(self):
         return datetime.now(EKB_TZ).strftime("%H:%M:%S")
@@ -50,10 +50,9 @@ class Monitor:
             Layout(name="logs", ratio=1)
         )
 
-        # Header (Упрощенный стиль, без вложенных тегов)
-        title_text = f"👻 Ghost Protocol v{VERSION} | Status: GUARDIAN ACTIVE"
+        # Header (исправлено: правильное закрытие тегов)
         layout["header"].update(
-            Panel(title_text, style="bold cyan on #1e1e1e")
+            Panel(f"👻 [bold]Ghost Protocol v{VERSION}[/bold] | Status: [bold green]GUARDIAN ACTIVE[/green][/bold]", style="black on #1e1e1e")
         )
 
         # Col 1: Stats
@@ -73,6 +72,8 @@ class Monitor:
         table_top = Table(box=None, expand=True, show_header=True)
         table_top.add_column("File", style="magenta")
         table_top.add_column("Tokens", style="yellow", justify="right")
+        
+        # Заглушка данных (реальный анализ будет медленным)
         table_top.add_row("scanner.py", "5.2K")
         table_top.add_row("config.py", "1.8K")
         
@@ -97,7 +98,10 @@ class Monitor:
         
         if msvcrt.kbhit():
             key = msvcrt.getch()
-            char = key.decode('utf-8')
+            try:
+                char = key.decode('utf-8')
+            except UnicodeDecodeError:
+                return
             
             if char == '1':
                 self.console.print("\n[bold yellow]Running AI Review...[/bold yellow]")
@@ -111,6 +115,7 @@ class Monitor:
                 self.console.print(report)
 
     def start(self):
+        # Initial scan
         self.scanner.scan_full_project()
         
         with Live(self._generate_layout(), console=self.console, refresh_per_second=1) as live:

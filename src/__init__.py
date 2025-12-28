@@ -3,6 +3,6 @@ Ghost Protocol
 The automated guardian of your codebase.
 """
 
-__version__ = "1.1.6"
+__version__ = "1.2.0"
 __author__ = "Adrena1ine"
 __all__ = ["Config", "IgnoreFileManager", "ProjectScanner"]

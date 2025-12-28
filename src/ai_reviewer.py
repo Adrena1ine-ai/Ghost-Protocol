@@ -23,36 +23,40 @@ class AIReviewer:
     def __init__(self, root: Path):
         self.root = root
         self.cfg = Config.get()
-        
+        self.last_generated_prompt = ""
+        self.last_review_status = "Checking API Key..."
         self.client = None
         self.model = None
-        
-        if USE_NEW_API and GenAIClient:
-            # Новый API (google-genai)
-            try:
+
+        # Проверка ключа
+        if not self.cfg.ai_api_key or self.cfg.ai_api_key.strip() == "":
+            self.last_review_status = "Error: API Key is empty. Check ghost_config.json."
+            logger.warning("AI API Key is empty. AI Review will not work.")
+            return
+
+        # Инициализация клиента
+        try:
+            if USE_NEW_API and GenAIClient:
+                # Новый API (google-genai)
                 self.client = GenAIClient(api_key=self.cfg.ai_api_key)
-                # Получаем модель по имени
                 self.model = self.cfg.ai_model
-            except Exception as e:
-                logger.error(f"Failed to initialize google-genai client: {e}")
-                self.client = None
-        elif not USE_NEW_API and genai:
-            # Старый API (google-generativeai)
-            try:
+                self.last_review_status = "AI Ready (google-genai)"
+            elif not USE_NEW_API and genai:
+                # Старый API (google-generativeai)
                 genai.configure(api_key=self.cfg.ai_api_key)
                 self.model = genai.GenerativeModel(self.cfg.ai_model)
-            except Exception as e:
-                logger.error(f"Failed to initialize google-generativeai: {e}")
-                self.model = None
-        
-        self.last_generated_prompt = ""
-        self.last_review_status = "Idle"
+                self.last_review_status = "AI Ready (google-generativeai)"
+            else:
+                self.last_review_status = "Error: No AI library available."
+        except Exception as e:
+            self.last_review_status = f"Init Error: {e}"
+            logger.error(f"AI Init failed: {e}")
 
     def run_review(self):
-        if not self.client and not self.model:
-            self.last_review_status = "AI client not initialized. Check API key or install google-genai."
-            return
-            
+        """Запускает ревью изменений (git diff) и генерирует промпт для исправления."""
+        if "Error" in self.last_review_status or not self.client and not self.model:
+            return # Не запускаем, если ошибка инициализации
+
         self.last_review_status = "Analyzing diff..."
         
         try:
@@ -92,13 +96,19 @@ class AIReviewer:
                 # Новый API (google-genai)
                 response = self.client.models.generate_content(
                     model=self.model,
-                    contents=review_prompt
+                    contents=[review_prompt]
                 )
                 # Извлекаем текст из ответа
                 if hasattr(response, 'text'):
                     result_text = response.text.strip()
                 elif hasattr(response, 'candidates') and response.candidates:
-                    result_text = response.candidates[0].content.parts[0].text.strip()
+                    if hasattr(response.candidates[0], 'content'):
+                        if hasattr(response.candidates[0].content, 'parts'):
+                            result_text = response.candidates[0].content.parts[0].text.strip()
+                        else:
+                            result_text = str(response.candidates[0].content).strip()
+                    else:
+                        result_text = str(response.candidates[0]).strip()
                 else:
                     result_text = str(response).strip()
             else:
