@@ -1,15 +1,21 @@
 import logging
 from rich.console import Console
 from rich.logging import RichHandler
+from .utils import GhostLogHandler
 
 console = Console()
 
 def setup_logger():
+    ghost_handler = GhostLogHandler()
+    
     logging.basicConfig(
         level="INFO",
         format="%(message)s",
         datefmt="[%X]",
-        handlers=[RichHandler(rich_tracebacks=True, show_path=False)]
+        handlers=[
+            ghost_handler,
+            RichHandler(rich_tracebacks=True, show_path=False)
+        ]
     )
     return logging.getLogger("ghost")
 

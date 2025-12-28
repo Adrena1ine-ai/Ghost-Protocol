@@ -47,13 +47,16 @@ class CodeAnalyzer:
 
     def analyze_complexity(self) -> Tuple[bool, str]:
         """Запускает Radon для подсчета сложности (CC)."""
-        # Radon умеет работать с каталогами, передаем только папки с кодом
+        # Radon умеет работать с каталогами, собираем все папки рекурсивно
         target_dirs = []
         try:
             cfg = Config.get()
-            for item in self.root.iterdir():
-                if item.is_dir() and item.name not in cfg.skip_dirs:
-                    target_dirs.append(str(item))
+            # Рекурсивный обход всех папок (как в run_lint)
+            for root_dir, dirs, files in os.walk(self.root):
+                # Фильтруем папки (чтобы не искать в venv и т.д.)
+                dirs[:] = [d for d in dirs if d not in cfg.skip_dirs and not d.startswith(".")]
+                # Добавляем текущую папку
+                target_dirs.append(root_dir)
         except OSError:
             pass
 
@@ -87,17 +90,17 @@ class CodeAnalyzer:
         
         report = []
         if lint_ok:
-            report.append("✅ Lint OK")
+            report.append("[OK] Lint OK")
         elif lint_ok is None:
-            report.append(f"⚠️ Lint: {lint_msg}")
+            report.append(f"[WARN] Lint: {lint_msg}")
         else:
-            report.append(f"❌ Lint Failed: {lint_msg}")
+            report.append(f"[FAIL] Lint Failed: {lint_msg}")
             
         if comp_ok:
-            report.append("✅ Complexity OK")
+            report.append("[OK] Complexity OK")
         elif comp_ok is None:
-            report.append(f"⚠️ Complexity: {comp_msg}")
+            report.append(f"[WARN] Complexity: {comp_msg}")
         else:
-            report.append(f"❌ High Complexity")
+            report.append(f"[FAIL] High Complexity")
             
         return "\n".join(report)

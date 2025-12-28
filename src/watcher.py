@@ -9,6 +9,7 @@ from watchdog.events import FileSystemEventHandler
 from .config import Config
 from .core import logger
 from .utils import move_to_trash
+from .classifier import FileClassifier
 
 class VibeWatcher(FileSystemEventHandler):
     def __init__(self, root: Path, task_queue: queue.Queue, ignore_mgr=None):
@@ -46,9 +47,14 @@ def get_extension(path: Path) -> str:
     if s == ".gz" and path.name.lower().endswith(".tar.gz"): return ".tar.gz"
     return s
 
-def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading.Event, ignore_mgr):
+def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading.Event, ignore_mgr, event_callback=None):
+    """
+    Воркер-поток: обрабатывает очередь файловых событий.
+    Использует FileClassifier для умной классификации.
+    """
     pending_files: Dict[str, float] = {} 
     MAX_PENDING = 1000
+    classifier = FileClassifier(root)
     
     while not shutdown_event.is_set():
         try:
@@ -72,45 +78,64 @@ def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading
         if ready_files:
             cfg = Config.get()
             trash_count = 0
+            junk_to_ignore = set()  # JUNK -> оба файла
+            data_to_ignore = set()  # DATA -> только .gitignore
             
             for f_str in ready_files:
                 path = Path(f_str)
                 if not path.exists(): continue
                 
                 try:
-                    size_mb = path.stat().st_size / (1024 * 1024)
-                    ext = get_extension(path)
-                    name_lower = path.name.lower()
-
-                    # --- ЛОГИКА КОРЗИНЫ (Auto-Cleanup) ---
-                    # Признаки для автоматического переноса в _trash:
-                    # 1. Очень большой файл ( > max_trash_size_mb )
-                    # 2. Подозрительное название (dump, backup, copy, v2)
-                    is_trash_candidate = (
-                        size_mb > cfg.max_trash_size_mb or 
-                        any(x in name_lower for x in ["dump", "backup", "copy", "old", "v2", "temp", "trash"])
-                    )
-
-                    # Исключаем критичные файлы проекта (main.py, config.py и т.д.)
-                    # Простая эвристика: если файл в корне и имеет стандартное имя, не трогаем
-                    is_critical = path.parent == root and name_lower in ["main.py", "config.py", "app.py", "manage.py"]
-
-                    if is_trash_candidate and not is_critical:
+                    rel_path = str(path.relative_to(root)).replace("\\", "/")
+                    
+                    # Используем умный классификатор
+                    action = classifier.classify(path)
+                    
+                    if action == "CODE" or action == "CRITICAL":
+                        # Код и критичные файлы — не трогаем
+                        continue
+                    
+                    elif action == "TRASH":
+                        # Перемещаем в корзину
                         rel = move_to_trash(root, path, cfg.trash_folder)
                         logger.info(f"[Ghost] Auto-moved to trash: {rel}")
                         trash_count += 1
-                        continue # Не обрабатываем дальше
-
-                    # --- СТАНДАРТНАЯ ЛОГИКА ИГНОРА ---
-                    if size_mb > cfg.max_asset_size_mb:
-                        if ext in cfg.garbage_extensions:
-                            rel_path = str(path.relative_to(root)).replace("\\", "/")
-                            ignore_mgr.add_entries({rel_path})
-                            continue
-
-                    if size_mb > cfg.max_code_size_mb and ext in cfg.code_extensions:
-                        logger.warning(f"[WARN] Heavy code: {path.name} ({size_mb:.2f} MB)")
+                        if event_callback:
+                            event_callback(f"Moved to trash: {path.name}")
+                    
+                    elif action == "JUNK":
+                        # Добавляем в оба файла (.gitignore + .cursorignore)
+                        junk_to_ignore.add(rel_path)
+                        logger.info(f"[Ghost] Classified as JUNK: {path.name}")
+                    
+                    elif action == "DATA":
+                        # Добавляем только в .gitignore (ИИ должен видеть)
+                        data_to_ignore.add(rel_path)
+                        logger.info(f"[Ghost] Classified as DATA: {path.name}")
+                    
+                    # UNKNOWN — оставляем как есть
+                    
                 except OSError: pass
             
+            # Батч-добавление в игнор (используем явные методы)
+            junk_count = 0
+            data_count = 0
+            
+            if junk_to_ignore:
+                junk_count = ignore_mgr.add_junk(junk_to_ignore)
+            
+            if data_to_ignore:
+                data_count = ignore_mgr.add_data(data_to_ignore)
+            
+            if junk_count > 0 or data_count > 0:
+                if event_callback:
+                    if junk_count > 0 and data_count > 0:
+                        event_callback(f"Ignored: {len(junk_to_ignore)} junk, {len(data_to_ignore)} data")
+                    elif junk_count > 0:
+                        event_callback(f"Ignored: {len(junk_to_ignore)} junk files")
+                    elif data_count > 0:
+                        event_callback(f"Ignored: {len(data_to_ignore)} data files (AI sees)")
+            
             if trash_count > 0:
-                logger.info(f"[Ghost] Cleaned up {trash_count} trash files.")
+                if event_callback:
+                    event_callback(f"Moved {trash_count} files to _trash")

@@ -102,7 +102,7 @@ Now forget about it. Ghost Protocol handles the rest.
 
 ```
 ┌──────────────────────────────────────────────────────────────┐
-│  👻 Ghost Protocol v21.0.0 | Status: ACTIVE                  │
+│  👻 Ghost Protocol v2.0.0 | Status: ACTIVE                  │
 ├─────────────────────────────┬────────────────────────────────┤
 │  📊 Project Stats           │  🧠 The Brain                  │
 │                             │                                │

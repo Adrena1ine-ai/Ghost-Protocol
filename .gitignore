@@ -16,6 +16,8 @@ env/
 .ghost_stats.json
 .ghost_config.json
 *.lock
+_trash/
+info/
 
 # OS
 .DS_Store
@@ -29,3 +31,4 @@ build/
 
 # PyPI credentials
 .pypirc
+PROJECT_SOURCE_CODE.txt  # ghost: auto

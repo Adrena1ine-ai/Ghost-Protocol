@@ -2,6 +2,9 @@ import os
 import sys
 import contextlib
 import shutil
+import logging
+import collections
+from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional, IO
 
@@ -72,3 +75,38 @@ def move_to_trash(root: Path, file_path: Path, trash_folder_name: str = "_trash"
         return relative_path # Возвращаем относительный путь для логов
     except Exception as e:
         raise Exception(f"Failed to move {file_path.name} to trash: {e}")
+
+
+# --- LOGGING SYSTEM ---
+
+EKB_TZ = timezone(timedelta(hours=5))
+
+class GhostLogHandler(logging.Handler):
+    """
+    Кастомный хендлер для сбора логов в UI.
+    Сохраняет логи в памяти для отображения в Monitor.
+    """
+    _instance = None
+
+    def __init__(self, max_logs: int = 50):
+        super().__init__()
+        self.logs = collections.deque(maxlen=max_logs)
+
+    def emit(self, record):
+        try:
+            timestamp = datetime.fromtimestamp(record.created, tz=EKB_TZ)
+            time_str = timestamp.strftime("%H:%M:%S")
+            level = record.levelname
+            message = record.getMessage()
+            log_line = f"[{time_str}] [{level}] {message}"
+            self.logs.append(log_line)
+        except Exception:
+            pass
+
+    def get_logs(self) -> list:
+        """Возвращает список логов"""
+        return list(self.logs)
+    
+    def clear(self):
+        """Очищает логи"""
+        self.logs.clear()
