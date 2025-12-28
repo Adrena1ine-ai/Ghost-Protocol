@@ -2,6 +2,7 @@ import argparse
 import sys
 import threading
 import queue
+import subprocess
 from pathlib import Path
 
 try:
@@ -15,6 +16,20 @@ try:
 except ImportError as e:
     print(f"Error: {e}. Run from project root.", file=sys.stderr)
     sys.exit(1)
+
+def ensure_dependencies():
+    """Автоматическая установка недостающих зависимостей"""
+    deps = ["ruff", "radon", "pyperclip", "google-generativeai"]
+    for dep in deps:
+        try:
+            __import__(dep)
+        except ImportError:
+            logger.info(f"[Setup] Installing missing dependency: {dep}...")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", dep], stdout=subprocess.DEVNULL)
+                logger.info(f"[Setup] {dep} installed successfully.")
+            except subprocess.CalledProcessError:
+                logger.error(f"[Setup] Failed to install {dep}. Some features may not work.")
 
 def install_hook(root: Path):
     Config.init(root)
@@ -51,6 +66,10 @@ def run_ghost_mode(root: Path):
     console.print(f"[bold cyan]👻 Ghost Protocol v{VERSION} Activated[/bold cyan]")
     Config.init(root)
     
+    # Установка зависимостей
+    if Config.get().auto_install_deps:
+        ensure_dependencies()
+    
     ignore_mgr = IgnoreFileManager(root)
     task_queue = queue.Queue(maxsize=5000)
     shutdown_event = threading.Event()
@@ -62,11 +81,19 @@ def run_ghost_mode(root: Path):
     )
     worker_thread.start()
     
-    # VibeWatcher now takes only root and queue
     event_handler = VibeWatcher(root, task_queue)
     observer = Observer()
     observer.schedule(event_handler, str(root), recursive=True)
     observer.start()
+
+    if not observer.is_alive():
+        logger.error("[Ghost] Observer failed to start.")
+        console.print("[red]❌ Ghost failed to start.[/red]")
+        return
+
+    logger.info("[Ghost] Watching for file changes...")
+    console.print("[green]✅ Ghost is now watching your project[/green]")
+    console.print("[dim]Press Ctrl+C to stop[/dim]")
 
     try:
         while observer.is_alive():
@@ -80,6 +107,8 @@ def run_ghost_mode(root: Path):
 
 def run_monitor(root: Path):
     Config.init(root)
+    if Config.get().auto_install_deps:
+        ensure_dependencies()
     Monitor(root).start()
 
 def main():

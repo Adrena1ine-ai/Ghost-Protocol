@@ -39,7 +39,7 @@ class ProjectScanner:
 
         if not output: return True
         
-        staged_files = output.split('\x0')
+        staged_files = output.split('\x00')
         cfg = Config.get()
         code_violations: List[str] = []
 

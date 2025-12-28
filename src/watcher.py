@@ -8,6 +8,7 @@ from watchdog.events import FileSystemEventHandler
 
 from .config import Config
 from .core import logger
+from .utils import move_to_trash
 
 class VibeWatcher(FileSystemEventHandler):
     def __init__(self, root: Path, task_queue: queue.Queue):
@@ -45,7 +46,6 @@ def get_extension(path: Path) -> str:
     return s
 
 def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading.Event, ignore_mgr):
-    # ignore_mgr passed here for usage in batch_add_to_ignore logic
     pending_files: Dict[str, float] = {} 
     MAX_PENDING = 1000
     
@@ -69,8 +69,8 @@ def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading
                 del pending_files[f_str]
         
         if ready_files:
-            assets_to_ignore = set()
             cfg = Config.get()
+            trash_count = 0
             
             for f_str in ready_files:
                 path = Path(f_str)
@@ -79,16 +79,37 @@ def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading
                 try:
                     size_mb = path.stat().st_size / (1024 * 1024)
                     ext = get_extension(path)
+                    name_lower = path.name.lower()
 
+                    # --- ЛОГИКА КОРЗИНЫ (Auto-Cleanup) ---
+                    # Признаки для автоматического переноса в _trash:
+                    # 1. Очень большой файл ( > max_trash_size_mb )
+                    # 2. Подозрительное название (dump, backup, copy, v2)
+                    is_trash_candidate = (
+                        size_mb > cfg.max_trash_size_mb or 
+                        any(x in name_lower for x in ["dump", "backup", "copy", "old", "v2", "temp", "trash"])
+                    )
+
+                    # Исключаем критичные файлы проекта (main.py, config.py и т.д.)
+                    # Простая эвристика: если файл в корне и имеет стандартное имя, не трогаем
+                    is_critical = path.parent == root and name_lower in ["main.py", "config.py", "app.py", "manage.py"]
+
+                    if is_trash_candidate and not is_critical:
+                        rel = move_to_trash(root, path, cfg.trash_folder)
+                        logger.info(f"[Ghost] Auto-moved to trash: {rel}")
+                        trash_count += 1
+                        continue # Не обрабатываем дальше
+
+                    # --- СТАНДАРТНАЯ ЛОГИКА ИГНОРА ---
                     if size_mb > cfg.max_asset_size_mb:
                         if ext in cfg.garbage_extensions:
                             rel_path = str(path.relative_to(root)).replace("\\", "/")
-                            assets_to_ignore.add(rel_path)
+                            ignore_mgr.add_entries({rel_path})
                             continue
 
                     if size_mb > cfg.max_code_size_mb and ext in cfg.code_extensions:
                         logger.warning(f"[WARN] Heavy code: {path.name} ({size_mb:.2f} MB)")
                 except OSError: pass
             
-            if assets_to_ignore: 
-                ignore_mgr.add_entries(assets_to_ignore)
+            if trash_count > 0:
+                logger.info(f"[Ghost] Cleaned up {trash_count} trash files.")

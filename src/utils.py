@@ -1,6 +1,7 @@
 import os
 import sys
 import contextlib
+import shutil
 from pathlib import Path
 from typing import Optional, IO
 
@@ -48,3 +49,26 @@ def atomic_write(path: Path, content: str):
     temp_path = path.with_name(f".{path.name}.tmp")
     temp_path.write_text(content, encoding="utf-8")
     os.replace(temp_path, path)
+
+def move_to_trash(root: Path, file_path: Path, trash_folder_name: str = "_trash"):
+    """
+    Перемещает файл в корзину внутри проекта, сохраняя структуру папок.
+    Например: root/data/dump.sql -> root/_trash/data/dump.sql
+    """
+    try:
+        relative_path = file_path.relative_to(root)
+        trash_dir = root / trash_folder_name
+        
+        # Определяем путь в корзине
+        destination_dir = trash_dir / relative_path.parent
+        destination_path = destination_dir / relative_path.name
+        
+        # Создаем папки
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Перемещаем
+        shutil.move(str(file_path), str(destination_path))
+        
+        return relative_path # Возвращаем относительный путь для логов
+    except Exception as e:
+        raise Exception(f"Failed to move {file_path.name} to trash: {e}")
