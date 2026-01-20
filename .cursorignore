@@ -1,0 +1,23 @@
+# Ghost Protocol auto-generated rules
+
+# Directories
+venv/
+.venv/
+env/
+__pycache__/
+node_modules/
+.git/
+_trash/
+
+# Files
+*.pyc
+*.pyo
+.DS_Store
+*.log
+
+# SECURITY: Never commit API keys!
+ghost_config.json
+.ghost_config.json
+*.api_key
+.env
+.env.local

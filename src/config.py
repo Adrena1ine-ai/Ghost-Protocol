@@ -73,7 +73,11 @@ DEFAULT_CONFIG = {
         "provider": "gemini",
         "model": "gemini-1.5-flash", # Самый быстрый и дешевый для review
         "api_key": "", # Вставь свой ключ в ghost_config.json
-        "temperature": 0.2 # Низкая температура для точности кода
+        "temperature": 0.2, # Низкая температура для точности кода
+        "gemini_api_key": "", # API ключ для Gemini (Supervisor)
+        "openai_api_key": "", # API ключ для OpenAI (Oracle)
+        "supervisor_model": "gemini-2.0-flash-exp", # Модель для Supervisor (Gemini)
+        "oracle_model": "gpt-4o-mini" # Модель для Oracle (OpenAI)
     },
     "system": {
         "trash_folder": "_trash",
@@ -236,6 +240,14 @@ class Config:
     def ai_api_key(self) -> str: return self._data['ai']['api_key']
     @property
     def ai_temperature(self) -> float: return self._data['ai']['temperature']
+    @property
+    def gemini_api_key(self) -> str: return self._data['ai'].get('gemini_api_key', '')
+    @property
+    def openai_api_key(self) -> str: return self._data['ai'].get('openai_api_key', '')
+    @property
+    def supervisor_model(self) -> str: return self._data['ai'].get('supervisor_model', 'gemini-2.0-flash-exp')
+    @property
+    def oracle_model(self) -> str: return self._data['ai'].get('oracle_model', 'gpt-4o-mini')
 
     # System Config
     @property

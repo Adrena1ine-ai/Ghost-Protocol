@@ -10,6 +10,7 @@ from .config import Config
 from .core import logger
 from .utils import move_to_trash
 from .classifier import FileClassifier
+from .analyzer import CodeAnalyzer
 
 class VibeWatcher(FileSystemEventHandler):
     def __init__(self, root: Path, task_queue: queue.Queue, ignore_mgr=None):
@@ -47,14 +48,17 @@ def get_extension(path: Path) -> str:
     if s == ".gz" and path.name.lower().endswith(".tar.gz"): return ".tar.gz"
     return s
 
-def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading.Event, ignore_mgr, event_callback=None):
+def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading.Event, ignore_mgr, event_callback=None, ai_reviewer=None):
     """
     Воркер-поток: обрабатывает очередь файловых событий.
     Использует FileClassifier для умной классификации.
+    
+    God Mode: Для CODE файлов автоматически запускает Ruff и AI Review.
     """
     pending_files: Dict[str, float] = {} 
     MAX_PENDING = 1000
     classifier = FileClassifier(root)
+    analyzer = CodeAnalyzer(root)
     
     while not shutdown_event.is_set():
         try:
@@ -92,7 +96,33 @@ def process_queue(root: Path, task_queue: queue.Queue, shutdown_event: threading
                     action = classifier.classify(path)
                     
                     if action == "CODE" or action == "CRITICAL":
-                        # Код и критичные файлы — не трогаем
+                        # God Mode: Проверяем код через Ruff и AI
+                        # 1. Проверяем Ruff (мгновенное исправление)
+                        success, error_msg, diff = analyzer.check_file(path)
+                        if success is False and diff:
+                            # Ruff нашёл ошибки - создаём Auto-Fix задачу
+                            from .task_manager import TaskManager
+                            task_mgr = TaskManager(root)
+                            task_mgr.write_task(
+                                task_type="Auto-Fix",
+                                file_path=rel_path,
+                                diff=diff,
+                                instruction="Apply this diff automatically.",
+                                reason=f"Ruff lint errors: {error_msg[:100]}"
+                            )
+                            logger.info(f"[Ghost] Auto-Fix generated for {path.name}. Waiting for Cursor...")
+                            if event_callback:
+                                event_callback(f"Auto-Fix task: {path.name}")
+                        
+                        # 2. Если Ruff чист и изменения > 50 строк, отправляем в AI
+                        if ai_reviewer and success is not False:
+                            diff_lines = analyzer.get_file_diff_lines(path)
+                            if diff_lines > 50:
+                                # Вызываем AI Review в авторежиме
+                                ai_reviewer.run_review(file_path=path, auto_mode=True)
+                                if event_callback:
+                                    event_callback(f"AI review triggered: {path.name}")
+                        
                         continue
                     
                     elif action == "TRASH":

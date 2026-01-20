@@ -6,16 +6,55 @@ import subprocess
 import os
 from pathlib import Path
 
+# Добавляем директорию скрипта в sys.path для работы из любой директории
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+# Проверка и автоматическая установка критичных зависимостей
+def check_and_install_deps():
+    """Проверяет и автоматически устанавливает недостающие зависимости"""
+    critical_deps = {
+        'watchdog': 'watchdog',
+        'rich': 'rich',
+        'pyperclip': 'pyperclip',
+    }
+    
+    missing = []
+    for module_name, package_name in critical_deps.items():
+        try:
+            __import__(module_name)
+        except ImportError:
+            missing.append(package_name)
+    
+    if missing:
+        print(f"[Setup] Installing missing dependencies: {', '.join(missing)}...", file=sys.stderr)
+        try:
+            subprocess.check_call(
+                [sys.executable, "-m", "pip", "install", "--quiet"] + missing,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE
+            )
+            print(f"[Setup] Dependencies installed successfully.", file=sys.stderr)
+        except subprocess.CalledProcessError as e:
+            print(f"Error: Failed to install dependencies: {', '.join(missing)}", file=sys.stderr)
+            print(f"Please install manually: pip install {' '.join(missing)}", file=sys.stderr)
+            sys.exit(1)
+
+# Проверяем зависимости перед импортами
+check_and_install_deps()
+
 try:
     from src.watcher import VibeWatcher, Observer, process_queue
     from src.scanner import ProjectScanner
     from src.pruner import Pruner
     from src.monitor import Monitor
     from src.ignore_manager import IgnoreFileManager
+    from src.ai_reviewer import AIReviewer
     from src.core import console, logger
     from src.config import Config, VERSION
 except ImportError as e:
-    print(f"Error: {e}. Run from project root.", file=sys.stderr)
+    print(f"Error: {e}. Make sure Ghost Protocol is installed correctly.", file=sys.stderr)
     sys.exit(1)
 
 def install_hook(root: Path):
@@ -136,24 +175,27 @@ def run_full_start(root: Path):
     except Exception as e:
         logger.debug(f"Initial classification error (non-critical): {e}")
 
-    # 6. Watcher Thread (Background File System)
+    # 6. AI Reviewer (для God Mode Auto-Pilot)
+    ai_reviewer = AIReviewer(root)
+    
+    # 7. Watcher Thread (Background File System)
     task_queue = queue.Queue(maxsize=5000)
     shutdown_event = threading.Event()
     
-    # 7. UI Thread (создаем monitor сначала, чтобы передать callback)
+    # 8. UI Thread (создаем monitor сначала, чтобы передать callback)
     monitor = Monitor(root, scanner, task_queue, shutdown_event, ignore_mgr)
     
-    # 8. Watcher Thread (передаем callback для событий)
+    # 9. Watcher Thread (передаем callback для событий и AI Reviewer для God Mode)
     worker_thread = threading.Thread(
         target=process_queue, 
-        args=(root, task_queue, shutdown_event, ignore_mgr, monitor.add_log), 
+        args=(root, task_queue, shutdown_event, ignore_mgr, monitor.add_log, ai_reviewer), 
         daemon=True
     )
     worker_thread.start()
     console.print("[green][OK] Background watcher thread started[/green]")
     logger.info("[Ghost] Background watcher thread started")
     
-    # 9. Запускаем Monitor
+    # 10. Запускаем Monitor
     monitor.start()
 
 def run_setup():

@@ -32,3 +32,11 @@ build/
 # PyPI credentials
 .pypirc
 PROJECT_SOURCE_CODE.txt  # ghost: auto
+
+# Logs
+*.log
+logs/
+
+# Environment variables
+.env
+.env.local

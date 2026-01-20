@@ -104,3 +104,66 @@ class CodeAnalyzer:
             report.append(f"[FAIL] High Complexity")
             
         return "\n".join(report)
+    
+    def check_file(self, file_path: Path) -> Tuple[Optional[bool], str, Optional[str]]:
+        """
+        Проверяет один файл через Ruff
+        
+        Returns:
+            Tuple[success, error_message, diff]:
+            - success: True если чисто, False если ошибки, None если Ruff не установлен
+            - error_message: Сообщение об ошибке или пустая строка
+            - diff: Unified diff для автоправки (если есть ошибки)
+        """
+        if file_path.suffix.lower() not in TARGET_EXTENSIONS:
+            return True, "", None
+        
+        if not file_path.exists():
+            return None, "File not found", None
+        
+        # Проверяем Ruff
+        cmd = ["ruff", "check", str(file_path)]
+        try:
+            result = subprocess.run(cmd, cwd=self.root, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0:
+                return True, "", None
+            else:
+                error_msg = result.stderr.strip() or result.stdout.strip() or "Lint errors found."
+                
+                # Пытаемся получить diff для автоправки (только для исправимых ошибок)
+                diff_cmd = ["ruff", "check", "--fix", "--diff", str(file_path)]
+                try:
+                    diff_result = subprocess.run(diff_cmd, cwd=self.root, capture_output=True, text=True, timeout=10)
+                    # Ruff возвращает diff в stdout, даже если есть ошибки
+                    diff_output = diff_result.stdout.strip()
+                    diff = diff_output if diff_output and "---" in diff_output else None
+                    return False, error_msg, diff
+                except Exception:
+                    # Для синтаксических ошибок diff может быть недоступен - это нормально
+                    return False, error_msg, None
+                    
+        except FileNotFoundError:
+            return None, "Ruff not installed.", None
+        except Exception as e:
+            return None, str(e), None
+    
+    def get_file_diff_lines(self, file_path: Path) -> int:
+        """Возвращает количество измененных строк в git diff для файла"""
+        try:
+            result = subprocess.run(
+                ["git", "diff", "--numstat", str(file_path)],
+                cwd=self.root,
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # Формат: additions deletions filename
+                parts = result.stdout.strip().split()
+                if len(parts) >= 2:
+                    additions = int(parts[0]) if parts[0].isdigit() else 0
+                    deletions = int(parts[1]) if parts[1].isdigit() else 0
+                    return additions + deletions
+        except Exception:
+            pass
+        return 0
